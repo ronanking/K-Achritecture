@@ -315,30 +315,32 @@ Put a platform rate limit in front of the route for anything stronger.
 
 ## Deployment
 
-The intended flow is **local → GitHub → Vercel**, with preview deployments on
-every branch and pull request.
+**The site is live at https://k-architecture.vercel.app** — Vercel project
+`k-architecture` in the `ronankings-projects` team, production target, all
+thirteen routes serving.
 
-A Vercel project named **`k-architecture`** already exists in the
-`ronankings-projects` team, and its build pipeline has been verified against
-this repository (Next.js 16 detected, dependencies install, Turbopack build
-runs). It needs one thing: the Git connection, which can only be made from the
-dashboard.
+That first deployment was uploaded directly, so it is **not yet wired to this
+repository**. To get the intended **local → GitHub → Vercel** flow — pushes
+deploying themselves, and a preview URL for every branch and pull request —
+connect the repo once:
 
 1. Open
    [vercel.com/ronankings-projects/k-architecture/settings/git](https://vercel.com/ronankings-projects/k-architecture/settings/git)
-   → **Connect Git Repository** → `ronanking/K-Achritecture`.
-   *(Or import the repo fresh at [vercel.com/new](https://vercel.com/new) —
-   framework, build command and output directory are all auto-detected and no
-   configuration is required either way.)*
+   → **Connect Git Repository** → `ronanking/K-Achritecture`, and set the
+   production branch. Framework, build command and output directory are all
+   auto-detected; there is no configuration to add.
 2. Add the environment variables from `.env.example` to Production and Preview.
-   `NEXT_PUBLIC_SITE_URL` should be the production domain.
-3. Set the production branch, then **Deploy**. From that point on, pushes to
-   the production branch go live and every other branch gets its own preview
-   URL — which is the whole workflow this repository is set up for.
+3. Push. From then on the deployed site is built from this repository rather
+   than from an upload, and every branch gets its own preview.
 
-Nothing in the codebase needs changing to deploy. `npm run build` passes
-cleanly, all pages except the enquiry route are statically generated, and there
-is no custom Vercel configuration to maintain.
+Note on canonical URLs: with `NEXT_PUBLIC_SITE_URL` unset, canonicals, Open
+Graph URLs and the sitemap all point at `www.karchitecture.com.au`. That is
+correct for the real domain and has the useful side effect of keeping the
+`vercel.app` URL from competing with it in search. Set the variable only once
+the site is being served from a domain you want indexed.
+
+Nothing in the codebase needs changing to deploy: `npm run build` passes
+cleanly and every page except the enquiry route is statically generated.
 
 `robots.ts` blocks indexing on any deployment where `VERCEL_ENV` is not
 `production`, so preview URLs never compete with the real site in search.
