@@ -318,13 +318,27 @@ Put a platform rate limit in front of the route for anything stronger.
 The intended flow is **local → GitHub → Vercel**, with preview deployments on
 every branch and pull request.
 
-1. Import `ronanking/K-Achritecture` at [vercel.com/new](https://vercel.com/new).
-   Framework, build command and output directory are all detected — no
-   configuration is required.
-2. Add the environment variables from `.env.example` (Production and Preview).
+A Vercel project named **`k-architecture`** already exists in the
+`ronankings-projects` team, and its build pipeline has been verified against
+this repository (Next.js 16 detected, dependencies install, Turbopack build
+runs). It needs one thing: the Git connection, which can only be made from the
+dashboard.
+
+1. Open
+   [vercel.com/ronankings-projects/k-architecture/settings/git](https://vercel.com/ronankings-projects/k-architecture/settings/git)
+   → **Connect Git Repository** → `ronanking/K-Achritecture`.
+   *(Or import the repo fresh at [vercel.com/new](https://vercel.com/new) —
+   framework, build command and output directory are all auto-detected and no
+   configuration is required either way.)*
+2. Add the environment variables from `.env.example` to Production and Preview.
    `NEXT_PUBLIC_SITE_URL` should be the production domain.
-3. Deploy. Pushes to the default branch go to production; every other branch
-   gets a preview URL.
+3. Set the production branch, then **Deploy**. From that point on, pushes to
+   the production branch go live and every other branch gets its own preview
+   URL — which is the whole workflow this repository is set up for.
+
+Nothing in the codebase needs changing to deploy. `npm run build` passes
+cleanly, all pages except the enquiry route are statically generated, and there
+is no custom Vercel configuration to maintain.
 
 `robots.ts` blocks indexing on any deployment where `VERCEL_ENV` is not
 `production`, so preview URLs never compete with the real site in search.

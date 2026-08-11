@@ -19,10 +19,7 @@ import type { Plate as PlateData, PlateTone } from "@/lib/projects/types";
 const toneField: Record<PlateTone, string> = {
   shadow:
     "linear-gradient(158deg, #171716 0%, #0e0e0d 42%, #1d1c1a 78%, #101010 100%)",
-  mid: "linear-gradient(158deg, #4a4842 0%, #33322d 46%, #56544c 82%, #3b3ا39 100%)".replace(
-    "3b3ا39",
-    "3b3a36",
-  ),
+  mid: "linear-gradient(158deg, #4a4842 0%, #33322d 46%, #56544c 82%, #3b3a36 100%)",
   light:
     "linear-gradient(158deg, #d9d4c9 0%, #efebe4 44%, #c9c4b7 80%, #e4e0d7 100%)",
 };
