@@ -93,7 +93,12 @@ export function ProjectIndex({
   return (
     <div className="frame">
       {/* ---- Divisions ------------------------------------------------ */}
-      <nav aria-label="Filter by division" className="rule-b rule-t py-4">
+      {/* Stays with the reader. A schedule this long is no use if the key to
+          it scrolls away. */}
+      <nav
+        aria-label="Filter by division"
+        className="rule-b rule-t sticky top-[var(--nav-h)] z-20 bg-paper py-4"
+      >
         <ul className="-mx-2 flex flex-wrap items-center gap-x-1 gap-y-2">
           <FilterTab
             active={active === "all"}

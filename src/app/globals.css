@@ -328,6 +328,17 @@ html[data-anim="on"] [data-reveal="fade"] {
   opacity: 0;
 }
 
+/* Content that an animation will bring in. Hidden ONLY when that animation is
+   going to run — never by a hard-coded class, which is how content ends up
+   permanently invisible to somebody who asked for less movement. */
+html[data-anim="on"] [data-hide="fade"] {
+  opacity: 0;
+}
+
+html[data-anim="on"] [data-hide="wipe"] {
+  clip-path: inset(100% 0% 0% 0%);
+}
+
 /* Strokes that are drawn on. pathLength="1" normalises every path so one
    dash length works regardless of the geometry. */
 html[data-anim="on"] [data-draw] path {
@@ -339,6 +350,56 @@ html[data-anim="on"] [data-draw] path {
    that opens it is going to run. */
 html[data-anim="on"] [data-aperture] {
   clip-path: inset(50% 46% 50% 46%);
+}
+
+/* ==========================================================================
+   THE SHEET STACK
+
+   By default — no JavaScript, or reduced motion — selected work is an
+   ordinary sequence of plates, each with its caption beneath it. Every
+   project is visible and every caption is readable by scrolling.
+
+   Only when the document has confirmed it will animate does the same markup
+   become the stack: one held frame, sheets laid down over one another as the
+   page is scrolled.
+   ========================================================================== */
+
+[data-stack-item] {
+  position: relative;
+  aspect-ratio: 16 / 9;
+}
+
+[data-stack-captions] {
+  display: none;
+}
+
+html[data-anim="on"] [data-stack] {
+  height: var(--stack-h);
+}
+
+html[data-anim="on"] [data-stack-viewport] {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  overflow: hidden;
+}
+
+html[data-anim="on"] [data-stack-item] {
+  position: absolute;
+  inset: 0;
+  aspect-ratio: auto;
+}
+
+html[data-anim="on"] [data-stack-item]:not(:first-child) {
+  clip-path: inset(100% 0% 0% 0%);
+}
+
+html[data-anim="on"] [data-static-caption] {
+  display: none;
+}
+
+html[data-anim="on"] [data-stack-captions] {
+  display: block;
 }
 
 /* ==========================================================================

@@ -272,7 +272,7 @@ export function Overture({ project }: { project: Project }) {
               className="ov-mark h-16 w-auto text-linen md:h-24"
               strokeWidth={1.1}
             />
-            <p className="ov-note note max-w-[16ch] text-right opacity-0">
+            <p data-hide="fade" className="ov-note note max-w-[16ch] text-right">
               {site.region}
             </p>
           </div>
@@ -280,19 +280,21 @@ export function Overture({ project }: { project: Project }) {
           <div className="bays items-end gap-y-8">
             <h1
               ref={title}
-              className="ov-title display-tight col-span-6 text-h1 opacity-0 md:col-span-8 lg:col-span-7"
+              data-hide="fade"
+              className="ov-title display-tight col-span-6 text-h1 md:col-span-8 lg:col-span-7"
             >
               Elevating the standard of modern architecture
             </h1>
 
             <div className="col-span-6 flex items-end justify-between md:col-span-4 lg:col-span-5">
-              <p className="ov-note note max-w-[22ch] opacity-0">
+              <p data-hide="fade" className="ov-note note max-w-[22ch]">
                 Scroll — concept, drawing, space, built form
               </p>
 
               <Link
                 href={`/projects/${project.slug}`}
-                className="ov-caption group block text-right opacity-0"
+                data-hide="fade"
+                className="ov-caption group block text-right"
                 data-cursor="View"
               >
                 <span className="note block opacity-55">Selected work</span>

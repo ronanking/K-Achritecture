@@ -87,6 +87,21 @@ export function SiteHeader() {
         ref={ref}
         className={`fixed inset-x-0 top-0 z-50 transition-colors duration-500 ${colour}`}
       >
+        {/* Light falling on the bar from the surface behind it. A gradient
+            rather than a filled bar, so that a full-bleed photograph is
+            shaded at its top edge instead of being cut by a band. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[calc(var(--nav-h)*2.1)] transition-opacity duration-500"
+          style={{
+            opacity: scrolled && !open ? 1 : 0,
+            background:
+              tone === "light"
+                ? "linear-gradient(to bottom, rgba(11,11,11,.95) 0%, rgba(11,11,11,.78) 46%, rgba(11,11,11,0) 100%)"
+                : "linear-gradient(to bottom, rgba(239,235,228,.96) 0%, rgba(239,235,228,.82) 46%, rgba(239,235,228,0) 100%)",
+          }}
+        />
+
         <div className="frame flex h-[var(--nav-h)] items-center justify-between">
           <Link
             href="/"

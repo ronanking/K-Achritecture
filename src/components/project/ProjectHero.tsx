@@ -98,7 +98,7 @@ export function ProjectHero({
       />
 
       <div className="ph-lockup frame absolute inset-x-0 bottom-0 pb-10 text-paper md:pb-14">
-        <div className="ph-meta note mb-5 flex items-baseline justify-between opacity-0">
+        <div data-hide="fade" className="ph-meta note mb-5 flex items-baseline justify-between">
           <span>{reference}</span>
           <span>{categoryTitle(project.category)}</span>
         </div>
@@ -110,16 +110,17 @@ export function ProjectHero({
 
         <h1
           ref={title}
-          className="ph-title display-tight text-mega opacity-0"
+          data-hide="fade"
+          className="ph-title display-tight text-mega"
         >
           {project.title}
         </h1>
 
         {project.subtitle ? (
-          <p className="ph-meta note mt-4 opacity-0">{project.subtitle}</p>
+          <p data-hide="fade" className="ph-meta note mt-4">{project.subtitle}</p>
         ) : null}
 
-        <div className="ph-meta note mt-6 flex flex-wrap gap-x-8 gap-y-1 opacity-0">
+        <div data-hide="fade" className="ph-meta note mt-6 flex flex-wrap gap-x-8 gap-y-1">
           {project.location ? <span>{project.location}</span> : null}
           {project.year ? <span>{project.year}</span> : null}
           {project.status ? <span>{project.status}</span> : null}

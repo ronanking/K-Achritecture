@@ -142,7 +142,7 @@ function PendingField({
       {/* Drafting film: a fine grid at the threshold of visibility. */}
       <div
         aria-hidden
-        className="absolute inset-0 opacity-[0.16]"
+        className="absolute inset-0 opacity-[0.12]"
         style={{
           backgroundImage: `linear-gradient(to right, ${line} 1px, transparent 1px), linear-gradient(to bottom, ${line} 1px, transparent 1px)`,
           backgroundSize: "clamp(48px, 8vw, 96px) clamp(48px, 8vw, 96px)",
@@ -154,34 +154,24 @@ function PendingField({
       />
 
       {/* Registration marks, one to each corner. */}
-      <svg
-        aria-hidden
-        className="absolute inset-0 h-full w-full opacity-40"
-        preserveAspectRatio="none"
-      >
-        <g stroke={line} strokeWidth="1" fill="none">
-          <path d="M0 24 H24 M24 0 V24" />
-          <path d="M100% 24 H calc(100% - 24)" />
-        </g>
-      </svg>
       <Corner className="left-3 top-3" />
       <Corner className="right-3 top-3 rotate-90" />
       <Corner className="right-3 bottom-3 rotate-180" />
       <Corner className="bottom-3 left-3 -rotate-90" />
 
-      <div className="absolute inset-0 flex items-center justify-center">
-        <span
-          aria-hidden
-          className="note opacity-45"
-          style={{ letterSpacing: "0.3em" }}
-        >
+      {/* Held in the centre of the frame rather than at its edges, so a
+          caption or a title overlaid on the plate never collides with it. */}
+      <div
+        aria-hidden
+        className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 text-center"
+      >
+        <span className="note opacity-50" style={{ letterSpacing: "0.32em" }}>
           {reference ?? "Plate"}
         </span>
-      </div>
-
-      <div className="note absolute inset-x-3 bottom-3 flex items-end justify-between opacity-45">
-        <span aria-hidden>Photograph to be supplied</span>
-        <span aria-hidden>{ratioLabel(aspect)}</span>
+        <span className="block h-px w-10 bg-current opacity-25" />
+        <span className="note opacity-35">
+          Photograph to be supplied · {ratioLabel(aspect)}
+        </span>
       </div>
     </div>
   );

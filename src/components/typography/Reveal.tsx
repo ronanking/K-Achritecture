@@ -65,8 +65,14 @@ export function Reveal({
                   : { trigger: el, start, once: true },
                 onComplete: () => {
                   played = true;
+                  // Revert the split so the text goes back to ordinary
+                  // reflowing markup, and retire the pre-hide flag. Once the
+                  // reveal has run there must be nothing left that could hide
+                  // this text again — not a reverted inline style, not a
+                  // re-split, not a resize.
                   split.revert();
-                  gsap.set(el, { clearProps: "opacity" });
+                  el.removeAttribute("data-reveal");
+                  gsap.set(el, { opacity: 1 });
                 },
               })
               .set(el, { opacity: 1 })

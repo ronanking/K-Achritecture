@@ -16,7 +16,7 @@ export function SiteFooter() {
     <footer data-surface="ink" className="relative">
       <div className="frame">
         <div className="rule-t bays gap-y-10 py-12 md:py-16">
-          <div className="col-span-6 md:col-span-4 lg:col-span-3">
+          <div className="col-span-6 md:order-1 md:col-span-3">
             <Cell label="Practice">
               <div className="mb-4 flex items-center gap-3">
                 <KMark className="h-6 w-auto" />
@@ -30,7 +30,7 @@ export function SiteFooter() {
             </Cell>
           </div>
 
-          <div className="col-span-3 md:col-span-3 lg:col-span-3 lg:col-start-5">
+          <div className="col-span-3 md:order-2 md:col-span-3">
             <Cell label="Studio">
               <address className="not-italic opacity-70">
                 <p>{site.address.line1}</p>
@@ -40,11 +40,16 @@ export function SiteFooter() {
             </Cell>
           </div>
 
-          <div className="col-span-3 md:col-span-2 lg:col-span-3">
+          {/* Full measure on handheld: the studio address is longer than a
+              half column can hold without breaking mid-word. */}
+          <div className="col-span-6 md:order-3 md:col-span-3">
             <Cell label="Contact">
               <ul className="space-y-1 opacity-70">
                 <li>
-                  <a className="hover:opacity-100" href={`mailto:${site.email}`}>
+                  <a
+                    className="break-words hover:opacity-100"
+                    href={`mailto:${site.email}`}
+                  >
                     {site.email}
                   </a>
                 </li>
@@ -60,7 +65,7 @@ export function SiteFooter() {
             </Cell>
           </div>
 
-          <div className="col-span-6 md:col-span-3 lg:col-span-3">
+          <div className="col-span-3 md:order-4 md:col-span-3">
             <Cell label="Index">
               <ul className="space-y-1 opacity-70">
                 {nav.map((item) => (

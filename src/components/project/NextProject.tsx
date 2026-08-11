@@ -68,8 +68,8 @@ export function NextProject({
       <div className="sticky top-0 h-[100svh] overflow-hidden">
         <div
           data-next-media
+          data-hide="wipe"
           className="absolute inset-0 will-change-transform"
-          style={{ clipPath: "inset(100% 0% 0% 0%)" }}
         >
           <Plate
             plate={project.hero}
@@ -88,7 +88,7 @@ export function NextProject({
         </div>
 
         <div className="frame absolute inset-0 flex flex-col justify-end pb-12 text-paper md:pb-16">
-          <div data-next-type style={{ opacity: 0 }}>
+          <div data-next-type data-hide="fade">
             <p className="note mb-5 opacity-60">Next project</p>
             <div
               aria-hidden

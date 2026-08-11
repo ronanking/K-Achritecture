@@ -15,9 +15,16 @@ import type { Project } from "@/lib/projects/types";
  * the sequence reads as a set being assembled rather than a carousel being
  * clicked through.
  *
- * Held by `position: sticky`. The scroll length is calculated from the number
- * of projects, so adding a fifth project lengthens the section by exactly one
- * segment and nothing needs retuning.
+ * The stack is an enhancement, not the structure. Written plainly, this is a
+ * sequence of plates each with its caption — which is exactly what it stays
+ * as without JavaScript, or for a reader who has asked for less movement.
+ * The stacking behaviour is applied by CSS only once the document has
+ * confirmed it will animate (see globals.css → THE SHEET STACK), so no reader
+ * is ever left with eight projects hidden behind the first one.
+ *
+ * Held by `position: sticky`. The scroll length is derived from the number of
+ * projects, so adding a fifth lengthens the section by exactly one segment
+ * and nothing needs retuning.
  */
 export function SelectedWork({ projects }: { projects: Project[] }) {
   const root = useRef<HTMLElement>(null);
@@ -98,21 +105,32 @@ export function SelectedWork({ projects }: { projects: Project[] }) {
     <section
       ref={root}
       data-surface="ink"
+      data-stack
       aria-labelledby="selected-heading"
       className="relative"
-      style={{ height: `${(n + 1) * 100}svh` }}
+      style={{ "--stack-h": `${(n + 1) * 100}svh` } as React.CSSProperties}
     >
-      <div className="sticky top-0 h-[100svh] w-full overflow-hidden">
+      <div className="frame">
+        <div className="rule-b bays py-4">
+          <h2
+            id="selected-heading"
+            className="note col-span-3 opacity-45 md:col-span-2"
+          >
+            Selected work
+          </h2>
+          <p className="note col-span-3 text-right opacity-45 md:col-span-10">
+            {String(n).padStart(2, "0")} plates
+          </p>
+        </div>
+      </div>
+
+      <div data-stack-viewport className="w-full">
         {projects.map((project, i) => (
           <div
             key={project.slug}
+            data-stack-item
             data-plate={i}
-            className="absolute inset-0"
-            style={
-              i === 0
-                ? undefined
-                : { clipPath: "inset(100% 0% 0% 0%)" }
-            }
+            className="overflow-hidden"
           >
             <div data-media className="absolute inset-0 will-change-transform">
               <Plate
@@ -123,6 +141,7 @@ export function SelectedWork({ projects }: { projects: Project[] }) {
                 reference={`KA · ${String(i + 1).padStart(2, "0")}`}
               />
             </div>
+
             <div
               aria-hidden
               className="absolute inset-0"
@@ -131,21 +150,33 @@ export function SelectedWork({ projects }: { projects: Project[] }) {
                   "linear-gradient(to top, rgba(11,11,11,.82) 0%, rgba(11,11,11,.28) 38%, rgba(11,11,11,.12) 70%)",
               }}
             />
+
+            {/* The plain reading of this section. */}
+            <div
+              data-static-caption
+              className="frame absolute inset-x-0 bottom-0 pb-8 text-paper"
+            >
+              <p className="note mb-3 opacity-60">
+                {String(i + 1).padStart(2, "0")} —{" "}
+                {categoryTitle(project.category)}
+              </p>
+              <Link href={`/projects/${project.slug}`} data-cursor="Open">
+                <span className="display-tight block text-h3">
+                  {project.title}
+                </span>
+              </Link>
+              <p className="note mt-2 opacity-70">
+                {[project.location, project.year].filter(Boolean).join(" — ")}
+              </p>
+            </div>
           </div>
         ))}
 
-        {/* ---- Captions -------------------------------------------- */}
-        <div className="frame pointer-events-none absolute inset-0 flex flex-col justify-between py-[calc(var(--nav-h)+1rem)] text-paper">
-          <div className="flex items-start justify-between">
-            <h2 id="selected-heading" className="note opacity-60">
-              Selected work
-            </h2>
-            <p className="note opacity-60">
-              <span className="sr-only-k">Project </span>
-              {String(n).padStart(2, "0")} plates
-            </p>
-          </div>
-
+        {/* The held frame's caption, swapped as the sheets are laid down. */}
+        <div
+          data-stack-captions
+          className="frame pointer-events-none absolute inset-x-0 bottom-0 pb-[calc(var(--nav-h)*0.6)] text-paper"
+        >
           <div className="relative h-[9.5rem] md:h-[11rem]">
             {projects.map((project, i) => (
               <div
