@@ -3,33 +3,36 @@
 import { useRef } from "react";
 import Link from "next/link";
 import { gsap, useGSAP, ease, mq } from "@/lib/animation/gsap";
+import { Plate } from "@/components/media/Plate";
 import { Reveal } from "@/components/typography/Reveal";
+import type { PlateTone } from "@/lib/projects/types";
 
 /**
- * How the studio thinks.
+ * The four questions.
  *
- * Four positions the practice actually holds, each with the diagram an
- * architect would sketch to explain it — sun, air, ground, material. These are
- * ordinary architectural notation, drawn for this page. They are not
- * reproductions of any K Architecture drawing, and none is presented as one.
+ * Previously four columns of prose with a small diagram above each — which
+ * meant the section explaining how the studio thinks was the least visual
+ * thing on the page. The paragraphs are gone. What is left is the diagram
+ * itself, drawn over the space it describes, and the position it stands for.
  *
- * Each diagram draws itself once, on approach, and then stops. Nothing here
- * loops.
+ * The diagrams are ordinary architectural notation drawn for this page. They
+ * are not reproductions of any K Architecture drawing.
  */
 
 const PRINCIPLES: {
   index: string;
   label: string;
   headline: string;
-  body: string;
-  /** Ordered strokes. Drawn in this order, as they would be by hand. */
+  tone: PlateTone;
+  alt: string;
   strokes: string[];
 }[] = [
   {
     index: "01",
     label: "Light",
     headline: "Natural light, planned for",
-    body: "Orientation and opening are resolved early, so rooms are lit by the sun rather than corrected afterwards by fittings.",
+    tone: "light",
+    alt: "Sun falling deep into a living space through a full-height opening.",
     strokes: [
       "M6 46 H74",
       "M18 46 V26 H50 V26",
@@ -44,7 +47,8 @@ const PRINCIPLES: {
     index: "02",
     label: "Air",
     headline: "Cross ventilation, by design",
-    body: "Subtropical Queensland rewards a plan that lets air pass straight through it. Openings are placed in pairs, on opposite sides.",
+    tone: "mid",
+    alt: "Openings on opposite walls of a room, aligned so air passes through.",
     strokes: [
       "M6 46 H74",
       "M16 46 V22 H64 V46",
@@ -58,7 +62,8 @@ const PRINCIPLES: {
     index: "03",
     label: "Ground",
     headline: "Landscape, inside the plan",
-    body: "The garden is part of the brief. Buildings are set out around what is already growing, not over it.",
+    tone: "shadow",
+    alt: "A retained tree standing within the footprint of the building.",
     strokes: [
       "M6 46 C 18 41, 27 44, 36 46",
       "M36 46 H74",
@@ -74,7 +79,8 @@ const PRINCIPLES: {
     index: "04",
     label: "Material",
     headline: "Sourced close, chosen to age",
-    body: "Material selection favours what is available locally and what will still look correct in this climate in twenty years.",
+    tone: "mid",
+    alt: "Close detail of concrete meeting timber, weathered by the coast.",
     strokes: [
       "M6 46 H74",
       "M14 46 V20 H66 V46",
@@ -122,50 +128,58 @@ export function Method() {
           </p>
         </div>
 
-        <div className="py-16 md:py-24">
-          <Reveal
-            as="h2"
-            className="display-tight max-w-[16ch] text-h2"
-          >
-            <span id="method-heading">Every project answers the same four questions first.</span>
+        <div className="py-14 md:py-20">
+          <Reveal as="h2" className="display-tight max-w-[18ch] text-h2">
+            <span id="method-heading">
+              Every project answers the same four questions first.
+            </span>
           </Reveal>
 
-          <div className="mt-14 grid gap-x-[var(--gutter)] gap-y-12 md:mt-20 md:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-12 grid grid-cols-2 gap-x-[var(--gutter)] gap-y-10 md:mt-16 lg:grid-cols-4">
             {PRINCIPLES.map((p) => (
-              <article key={p.index} className="rule-t pt-6">
-                <div className="mb-6 flex items-baseline justify-between">
-                  <span className="note opacity-45">{p.index}</span>
-                  <span className="note opacity-45">{p.label}</span>
+              <article key={p.index}>
+                <div className="relative">
+                  <Plate
+                    plate={{ alt: p.alt, aspect: 3 / 4, tone: p.tone }}
+                    sizes="(min-width: 80rem) 22vw, (min-width: 48rem) 44vw, 44vw"
+                    reference={`KA · ${p.index}`}
+                  />
+
+                  {/* The diagram sits on the space it describes, the way a
+                      note is drawn over a photograph on a review sheet. */}
+                  <svg
+                    data-diagram
+                    data-draw
+                    viewBox="0 0 80 52"
+                    className="absolute left-3 top-3 h-auto w-[42%] text-paper mix-blend-difference"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1"
+                    strokeLinecap="square"
+                    aria-hidden
+                  >
+                    {p.strokes.map((d, i) => (
+                      <path
+                        key={i}
+                        d={d}
+                        pathLength={1}
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    ))}
+                  </svg>
                 </div>
 
-                <svg
-                  data-diagram
-                  data-draw
-                  viewBox="0 0 80 52"
-                  className="mb-7 h-auto w-full max-w-[15rem] text-ink"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1"
-                  strokeLinecap="square"
-                  aria-hidden
-                >
-                  {p.strokes.map((d, i) => (
-                    <path
-                      key={i}
-                      d={d}
-                      pathLength={1}
-                      vectorEffect="non-scaling-stroke"
-                    />
-                  ))}
-                </svg>
-
-                <h3 className="display-tight mb-3 text-h4">{p.headline}</h3>
-                <p className="text-body opacity-70">{p.body}</p>
+                <div className="rule-t mt-4 pt-3">
+                  <p className="note mb-2 opacity-45">
+                    {p.index} — {p.label}
+                  </p>
+                  <h3 className="display-tight text-h4">{p.headline}</h3>
+                </div>
               </article>
             ))}
           </div>
 
-          <div className="rule-t mt-14 pt-6 md:mt-20">
+          <div className="rule-t mt-12 pt-6">
             <Link
               href="/studio"
               className="group inline-flex items-baseline gap-4"

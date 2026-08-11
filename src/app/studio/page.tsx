@@ -6,12 +6,43 @@ import { Plate } from "@/components/media/Plate";
 import { studio } from "@/content/studio";
 import { categories } from "@/lib/projects/categories";
 import { site } from "@/lib/site";
+import type { PlateTone } from "@/lib/projects/types";
 
 export const metadata: Metadata = {
   title: "Studio",
   description:
     "K Architecture is a boutique architectural practice on the Sunshine Coast, working across private houses, renovations, townhouses, multi-residential developments and interior fit-outs.",
   alternates: { canonical: "/studio" },
+};
+
+/**
+ * The studio page was, frankly, an essay: two statement paragraphs, four
+ * position paragraphs, four discipline sentences, five team notes and two
+ * community notes, all set as running text on an empty sheet.
+ *
+ * The four positions have gone — they are the homepage's Method section, said
+ * twice — and the disciplines now carry an image each. What is left is the
+ * material that only words can carry: who is here, what they are registered
+ * to do, and what the practice has been recognised for.
+ */
+
+const disciplinePlate: Record<string, { alt: string; tone: PlateTone }> = {
+  "new-homes-and-renovations": {
+    alt: "A private house opening to its garden.",
+    tone: "light",
+  },
+  townhouses: {
+    alt: "Attached housing addressing a suburban street.",
+    tone: "mid",
+  },
+  "multi-residential": {
+    alt: "An apartment building against the sky.",
+    tone: "shadow",
+  },
+  "fit-outs": {
+    alt: "Joinery and finishes in a completed interior fit-out.",
+    tone: "mid",
+  },
 };
 
 export default function StudioPage() {
@@ -26,22 +57,22 @@ export default function StudioPage() {
         />
 
         <div className="frame">
-          <div className="bays gap-y-10 pb-20 md:pb-28">
-            <div className="col-span-6 md:col-span-8 md:col-start-3">
-              {studio.statement.map((para, i) => (
-                <Reveal
-                  key={i}
-                  as="p"
-                  delay={i * 0.05}
-                  className={
-                    i === 0
-                      ? "prose-k text-h4 leading-[1.42]"
-                      : "prose-k mt-7 opacity-75"
-                  }
-                >
-                  {para}
-                </Reveal>
-              ))}
+          <div className="bays items-end gap-y-12 pb-16 md:pb-24">
+            <div className="col-span-6 md:col-span-6">
+              <Plate
+                plate={{
+                  alt: "The studio's work seen at close range — light across a finished interior.",
+                  aspect: 4 / 3,
+                  tone: "mid",
+                }}
+                sizes="(min-width: 48rem) 50vw, 92vw"
+                reference="KA · Studio"
+              />
+            </div>
+            <div className="col-span-6 md:col-span-5 md:col-start-8">
+              <Reveal as="p" className="prose-k text-h4 leading-[1.35]">
+                {studio.statement[0]}
+              </Reveal>
             </div>
           </div>
 
@@ -49,66 +80,47 @@ export default function StudioPage() {
             {studio.figures.map((f) => (
               <div key={f.label} className="col-span-6 md:col-span-4">
                 <dd className="display-tight text-h2">{f.value}</dd>
-                <dt className="note mt-3 max-w-[26ch] opacity-45">{f.label}</dt>
+                <dt className="note mt-3 max-w-[24ch] opacity-45">{f.label}</dt>
               </div>
             ))}
           </dl>
         </div>
       </div>
 
-      {/* ---- What the practice designs for ---------------------------- */}
-      <section data-surface="ink" aria-labelledby="positions-heading">
-        <div className="frame py-20 md:py-28">
-          <h2
-            id="positions-heading"
-            className="note mb-12 opacity-45 md:mb-16"
-          >
-            What every project is designed for
-          </h2>
+      {/* ---- Disciplines, with the work behind them ------------------- */}
+      <section data-surface="ink" aria-labelledby="disciplines-heading">
+        <div className="frame py-16 md:py-24">
+          <div className="rule-b flex items-baseline justify-between pb-3">
+            <h2 id="disciplines-heading" className="note opacity-45">
+              Disciplines
+            </h2>
+            <p className="note opacity-45">04</p>
+          </div>
 
-          <div className="grid gap-x-[var(--gutter)] gap-y-12 md:grid-cols-2 lg:grid-cols-4">
-            {studio.positions.map((p) => (
-              <div key={p.index} className="rule-t pt-5">
-                <p className="note mb-6 opacity-40">{p.index}</p>
-                <h3 className="display-tight mb-3 text-h4">{p.title}</h3>
-                <p className="text-body opacity-70">{p.body}</p>
-              </div>
+          <div className="mt-10 grid grid-cols-2 gap-x-[var(--gutter)] gap-y-10 lg:grid-cols-4">
+            {categories.map((c) => (
+              <article key={c.id}>
+                <Plate
+                  plate={{ ...disciplinePlate[c.id], aspect: 3 / 4 }}
+                  sizes="(min-width: 80rem) 22vw, 44vw"
+                  reference="KA"
+                />
+                <h3 className="display-tight mt-4 text-h4">{c.title}</h3>
+                <p className="note mt-2 max-w-[26ch] opacity-50">{c.blurb}</p>
+              </article>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ---- Disciplines ---------------------------------------------- */}
-      <section data-surface="paper" aria-labelledby="disciplines-heading">
-        <div className="frame py-20 md:py-28">
-          <h2 id="disciplines-heading" className="note mb-10 opacity-45">
-            Disciplines
-          </h2>
-          <ul>
-            {categories.map((c) => (
-              <li key={c.id} className="rule-t">
-                <div className="bays items-baseline gap-y-2 py-7">
-                  <h3 className="display-tight col-span-6 text-h4 md:col-span-4">
-                    {c.title}
-                  </h3>
-                  <p className="col-span-6 text-body opacity-70 md:col-span-7 md:col-start-6">
-                    {c.blurb}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
-
       {/* ---- Team ------------------------------------------------------ */}
       <section data-surface="chalk" aria-labelledby="team-heading">
-        <div className="frame py-20 md:py-28">
-          <div className="bays rule-b pb-4">
-            <h2 id="team-heading" className="note col-span-3 opacity-45 md:col-span-2">
+        <div className="frame py-16 md:py-24">
+          <div className="rule-b flex items-baseline justify-between pb-3">
+            <h2 id="team-heading" className="note opacity-45">
               Team
             </h2>
-            <p className="note col-span-3 text-right opacity-45 md:col-span-10">
+            <p className="note opacity-45">
               Registered Architects — Queensland &amp; Victoria
             </p>
           </div>
@@ -116,17 +128,14 @@ export default function StudioPage() {
           <ul>
             {studio.team.map((m) => (
               <li key={m.name} className="rule-b">
-                <div className="bays items-baseline gap-y-3 py-8">
-                  <h3 className="display-tight col-span-6 text-h3 md:col-span-3">
+                <div className="bays items-baseline gap-y-2 py-6">
+                  <h3 className="display-tight col-span-3 text-h3 md:col-span-4">
                     {m.name}
                   </h3>
-                  <p className="note col-span-6 opacity-55 md:col-span-3">
+                  <p className="note col-span-3 opacity-55 md:col-span-5">
                     {m.role}
                   </p>
-                  <p className="col-span-6 text-body opacity-70 md:col-span-4">
-                    {"note" in m ? m.note : null}
-                  </p>
-                  <p className="note col-span-6 opacity-45 md:col-span-2 md:text-right">
+                  <p className="note col-span-6 opacity-40 md:col-span-3 md:text-right">
                     {"qualification" in m ? m.qualification : null}
                   </p>
                 </div>
@@ -138,57 +147,62 @@ export default function StudioPage() {
 
       {/* ---- Recognition and community --------------------------------- */}
       <section data-surface="paper" aria-labelledby="recognition-heading">
-        <div className="frame py-20 md:py-28">
-          <div className="bays gap-y-14">
-            <div className="col-span-6 md:col-span-5">
+        <div className="frame py-16 md:py-24">
+          <div className="bays gap-y-12">
+            <div className="col-span-6 md:col-span-4">
               <h2
                 id="recognition-heading"
-                className="note rule-b mb-8 pb-4 opacity-45"
+                className="note rule-b mb-6 pb-3 opacity-45"
               >
                 Recognition
               </h2>
-              <ul className="space-y-8">
-                {studio.recognition.map((r) => (
-                  <li key={r.project}>
-                    <p className="display-tight text-h4">{r.project}</p>
-                    <p className="mt-2 text-body">{r.title}</p>
-                    <p className="note mt-2 opacity-55">{r.body}</p>
-                    <p className="note mt-1 opacity-40">{r.year}</p>
+              {studio.recognition.map((r) => (
+                <div key={r.project}>
+                  <p className="display-tight text-h3">{r.project}</p>
+                  <p className="note mt-3 opacity-55">{r.title}</p>
+                  <p className="note mt-1 opacity-40">{r.year}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="col-span-6 md:col-span-4">
+              <h2 className="note rule-b mb-6 pb-3 opacity-45">Community</h2>
+              <ul className="space-y-5">
+                {studio.community.map((c) => (
+                  <li key={c.title}>
+                    <p className="display-tight text-h4">{c.title}</p>
                   </li>
                 ))}
               </ul>
             </div>
 
-            <div className="col-span-6 md:col-span-5 md:col-start-8">
-              <h2 className="note rule-b mb-8 pb-4 opacity-45">Community</h2>
-              <ul className="space-y-8">
-                {studio.community.map((c) => (
-                  <li key={c.title}>
-                    <p className="display-tight text-h4">{c.title}</p>
-                    <p className="mt-2 text-body opacity-70">{c.body}</p>
-                  </li>
-                ))}
-              </ul>
+            <div className="col-span-6 md:col-span-3 md:col-start-10">
+              <h2 className="note rule-b mb-6 pb-3 opacity-45">Studio</h2>
+              <address className="note not-italic opacity-55">
+                {site.address.line1}
+                <br />
+                {site.address.line2}
+              </address>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ---- Studio plate ---------------------------------------------- */}
-      <section data-surface="ink" aria-label="The studio">
+      {/* ---- Close ----------------------------------------------------- */}
+      <section data-surface="ink" aria-label="Contact the studio" className="relative">
         <Plate
           plate={{
-            alt: "The K Architecture studio at Marcoola on the Sunshine Coast.",
+            alt: "The Sunshine Coast at dusk, seen from one of the studio's buildings.",
             aspect: 21 / 9,
             tone: "shadow",
           }}
           sizes="100vw"
           reference="KA · Studio"
         />
-        <div className="frame py-16 md:py-24">
+        <div className="frame py-14 md:py-20">
           <div className="bays items-end gap-y-8">
-            <p className="prose-k col-span-6 text-h3 md:col-span-7">
-              The studio is at Marcoola, between the beach and the highway.
+            <p className="display-tight col-span-6 text-h2 md:col-span-7">
+              Marcoola, between the beach and the highway.
             </p>
             <div className="col-span-6 md:col-span-4 md:col-start-9">
               <Link
