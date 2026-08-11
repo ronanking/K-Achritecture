@@ -9,20 +9,44 @@ import type { Plate as PlateData, PlateTone } from "@/lib/projects/types";
  *
  * 1. The aspect ratio is declared before the file loads, so the layout is
  *    final from first paint and scroll-linked animation never re-measures.
- * 2. When the photograph has not been supplied, the plate is *drawn* rather
+ * 2. When the photograph has not been supplied, the plate is *composed* rather
  *    than faked. No stock photography stands in for K Architecture's work.
- *    A measured field holds the exact space the photograph will occupy, so
- *    dropping the real file at the path in the project data is the entire
- *    handover.
+ *    What fills the frame instead is a light study — raking light, shadow and
+ *    grain, deterministic per plate — so the space reads as art-directed
+ *    rather than as a missing asset, and the design around it can actually be
+ *    judged. Dropping the real file at the path in the project data replaces
+ *    it entirely.
  */
 
-const toneField: Record<PlateTone, string> = {
-  shadow:
-    "linear-gradient(158deg, #171716 0%, #0e0e0d 42%, #1d1c1a 78%, #101010 100%)",
-  mid: "linear-gradient(158deg, #4a4842 0%, #33322d 46%, #56544c 82%, #3b3a36 100%)",
-  light:
-    "linear-gradient(158deg, #d9d4c9 0%, #efebe4 44%, #c9c4b7 80%, #e4e0d7 100%)",
+/** Deterministic 0–1 from a string, so a plate always composes the same way. */
+function seeded(key: string, salt: number): number {
+  let h = 2166136261 ^ salt;
+  for (let i = 0; i < key.length; i++) {
+    h ^= key.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return ((h >>> 0) % 10000) / 10000;
+}
+
+/**
+ * Tonal range matters more than tonal accuracy here. A frame that is uniformly
+ * dark reads as a void rather than as a room, so even the shadow key carries a
+ * genuinely lit passage — the way a photograph of a dim interior always has a
+ * window in it somewhere.
+ */
+const palette: Record<PlateTone, { base: string; lit: string; deep: string }> = {
+  shadow: { base: "#2a2621", lit: "#b9ab93", deep: "#0d0c0b" },
+  mid: { base: "#5c564a", lit: "#e2d7c1", deep: "#1a1815" },
+  light: { base: "#ddd6c8", lit: "#fffdf8", deep: "#8d8474" },
 };
+
+/** How hard the light reads, per key. */
+const strength: Record<PlateTone, { pool: number; fill: number; shaft: number }> =
+  {
+    shadow: { pool: 0.82, fill: 0.4, shaft: 0.3 },
+    mid: { pool: 0.8, fill: 0.44, shaft: 0.32 },
+    light: { pool: 0.9, fill: 0.55, shaft: 0.4 },
+  };
 
 function ratioLabel(aspect: number): string {
   const known: [number, string][] = [
@@ -75,26 +99,25 @@ export function Plate({
       className={`relative overflow-hidden ${fill ? "h-full w-full" : ""} ${className}`}
       style={fill ? undefined : { aspectRatio: String(plate.aspect) }}
     >
-      {/* The tonal field sits under everything. When a photograph exists it
-          becomes the loading colour; when one does not, it is the plate. */}
-      <div
-        aria-hidden
-        className="absolute inset-0"
-        style={{ backgroundImage: toneField[tone] }}
-      />
-
       {plate.src ? (
-        <Image
-          src={plate.src}
-          alt={plate.alt}
-          fill
-          sizes={sizes}
-          priority={priority}
-          loading={priority ? undefined : "lazy"}
-          className={`object-cover ${mediaClassName}`}
-        />
+        <>
+          <div
+            aria-hidden
+            className="absolute inset-0"
+            style={{ backgroundColor: palette[tone].base }}
+          />
+          <Image
+            src={plate.src}
+            alt={plate.alt}
+            fill
+            sizes={sizes}
+            priority={priority}
+            loading={priority ? undefined : "lazy"}
+            className={`object-cover ${mediaClassName}`}
+          />
+        </>
       ) : (
-        <PendingField
+        <LightStudy
           reference={reference}
           aspect={plate.aspect}
           tone={tone}
@@ -112,10 +135,12 @@ export function Plate({
 }
 
 /**
- * The drawn stand-in. Registration marks, a sheet reference and the reserved
- * ratio — the notation a printed plate carries before the image is struck.
+ * The composed stand-in: light falling into a dark volume. Two soft pools, one
+ * hard shaft cut on an angle, and grain over the top. Every value is derived
+ * from the plate's own alt text, so each frame is different and each is stable
+ * across renders.
  */
-function PendingField({
+function LightStudy({
   reference,
   aspect,
   tone,
@@ -126,66 +151,107 @@ function PendingField({
   tone: PlateTone;
   alt: string;
 }) {
-  const onLight = tone === "light";
-  const line = onLight ? "#2b2b29" : "#c7c2b7";
+  const key = alt || reference || "plate";
+  const { base, lit, deep } = palette[tone];
+  const force = strength[tone];
+
+  const px = 22 + seeded(key, 1) * 56; // primary light, x
+  const py = 12 + seeded(key, 2) * 44; // primary light, y
+  const sx = 8 + seeded(key, 3) * 84; // secondary pool, x
+  const angle = 96 + seeded(key, 4) * 52; // shaft direction
+  const shaft = 26 + seeded(key, 5) * 26; // shaft position
+  const width = 7 + seeded(key, 6) * 11; // shaft width
 
   return (
     <div
       className="absolute inset-0"
-      style={{ color: line }}
       role="img"
       aria-label={`${alt} — photograph to be supplied`}
     >
-      {/* Drafting film: a fine grid at the threshold of visibility. */}
+      {/* Ground */}
       <div
         aria-hidden
-        className="absolute inset-0 opacity-[0.12]"
+        className="absolute inset-0"
         style={{
-          backgroundImage: `linear-gradient(to right, ${line} 1px, transparent 1px), linear-gradient(to bottom, ${line} 1px, transparent 1px)`,
-          backgroundSize: "clamp(48px, 8vw, 96px) clamp(48px, 8vw, 96px)",
-          maskImage:
-            "radial-gradient(120% 100% at 50% 40%, #000 20%, transparent 78%)",
-          WebkitMaskImage:
-            "radial-gradient(120% 100% at 50% 40%, #000 20%, transparent 78%)",
+          background: `radial-gradient(120% 90% at 50% 108%, ${deep} 0%, ${base} 55%, ${deep} 100%)`,
         }}
       />
 
-      {/* Registration marks, one to each corner. */}
-      <Corner className="left-3 top-3" />
-      <Corner className="right-3 top-3 rotate-90" />
-      <Corner className="right-3 bottom-3 rotate-180" />
-      <Corner className="bottom-3 left-3 -rotate-90" />
-
-      {/* Held in the centre of the frame rather than at its edges, so a
-          caption or a title overlaid on the plate never collides with it. */}
+      {/* Light pooling into the volume */}
       <div
         aria-hidden
-        className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 text-center"
-      >
-        <span className="note opacity-50" style={{ letterSpacing: "0.32em" }}>
-          {reference ?? "Plate"}
-        </span>
-        <span className="block h-px w-10 bg-current opacity-25" />
-        <span className="note opacity-35">
-          Photograph to be supplied · {ratioLabel(aspect)}
-        </span>
-      </div>
-    </div>
-  );
-}
+        className="absolute inset-0"
+        style={{
+          background: `radial-gradient(64% 80% at ${px}% ${py}%, ${lit} 0%, transparent 66%)`,
+          opacity: force.pool,
+        }}
+      />
+      <div
+        aria-hidden
+        className="absolute inset-0"
+        style={{
+          background: `radial-gradient(52% 46% at ${sx}% 88%, ${lit} 0%, transparent 72%)`,
+          opacity: force.fill,
+        }}
+      />
 
-function Corner({ className = "" }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 20 20"
-      className={`absolute h-4 w-4 opacity-55 ${className}`}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1"
-      vectorEffect="non-scaling-stroke"
-    >
-      <path d="M0 8 V0 H8" />
-    </svg>
+      {/* The shaft — light through an opening, falling across the floor */}
+      <div
+        aria-hidden
+        className="absolute inset-[-20%]"
+        style={{
+          background: `linear-gradient(${angle}deg, transparent ${shaft}%, ${lit} ${
+            shaft + width * 0.42
+          }%, transparent ${shaft + width}%)`,
+          opacity: force.shaft,
+          filter: "blur(2px)",
+        }}
+      />
+
+      {/* Grain. Keeps large flat areas from banding and reads as film. */}
+      <svg
+        aria-hidden
+        className="absolute inset-0 h-full w-full"
+        style={{ opacity: tone === "light" ? 0.28 : 0.4, mixBlendMode: "overlay" }}
+        preserveAspectRatio="none"
+      >
+        <filter id={`g${Math.round(seeded(key, 7) * 1e6)}`}>
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency="0.85"
+            numOctaves="3"
+            stitchTiles="stitch"
+          />
+          <feColorMatrix type="saturate" values="0" />
+        </filter>
+        <rect
+          width="100%"
+          height="100%"
+          filter={`url(#g${Math.round(seeded(key, 7) * 1e6)})`}
+        />
+      </svg>
+
+      {/* Vignette, so the frame holds its edges */}
+      <div
+        aria-hidden
+        className="absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(130% 108% at 50% 42%, transparent 52%, rgba(0,0,0,.34) 100%)",
+        }}
+      />
+
+      {/* The reference stays, small and in the corner — enough to identify the
+          sheet, not enough to announce that something is missing. */}
+      {reference ? (
+        <span
+          aria-hidden
+          className="note absolute bottom-3 left-3 opacity-25"
+          style={{ color: tone === "light" ? "#2b2b29" : "#c7c2b7" }}
+        >
+          {reference} · {ratioLabel(aspect)}
+        </span>
+      ) : null}
+    </div>
   );
 }

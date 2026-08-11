@@ -358,6 +358,64 @@ html[data-anim="on"] [data-draw] path {
    page is scrolled.
    ========================================================================== */
 
+/* ==========================================================================
+   THE HORIZONTAL BAND
+
+   Selected work does not run down the page with everything else. It runs
+   across it — vertical scroll driving lateral movement, so the work is
+   travelled through rather than fallen past. It is the one place the site
+   changes direction, which is what makes it register.
+
+   Written plainly it is an ordinary vertical list of plates, which is what it
+   stays as without JavaScript or with reduced motion.
+   ========================================================================== */
+
+:root {
+  --item-w: 84vw;
+  --item-gap: 5vw;
+}
+
+@media (min-width: 48rem) {
+  :root {
+    --item-w: 52vw;
+    --item-gap: 3vw;
+  }
+}
+
+[data-hstack-track] {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--gutter) * 3);
+}
+
+html[data-anim="on"] [data-hstack] {
+  height: calc(
+    100svh + (var(--n) * (var(--item-w) + var(--item-gap))) - 100vw +
+      var(--page-margin) * 2
+  );
+}
+
+html[data-anim="on"] [data-hstack-viewport] {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+html[data-anim="on"] [data-hstack-track] {
+  flex-direction: row;
+  gap: var(--item-gap);
+  padding-inline: var(--page-margin);
+  will-change: transform;
+}
+
+html[data-anim="on"] [data-hstack-item] {
+  width: var(--item-w);
+  flex: 0 0 auto;
+}
+
 [data-stack-item] {
   position: relative;
   aspect-ratio: 16 / 9;
