@@ -346,12 +346,6 @@ html[data-anim="on"] [data-draw] path {
   stroke-dashoffset: 1;
 }
 
-/* The opening the overture reveals through. Closed only when the sequence
-   that opens it is going to run. */
-html[data-anim="on"] [data-aperture] {
-  clip-path: inset(50% 46% 50% 46%);
-}
-
 /* ==========================================================================
    THE SHEET STACK
 
