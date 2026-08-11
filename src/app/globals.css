@@ -1,0 +1,364 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   K ARCHITECTURE — DESIGN TOKENS
+
+   The system is drawn, not decorated.
+
+   Everything on this site is set out from a DATUM: a hairline reference
+   from which type, image and space are measured — the same way a set of
+   drawings is set out from a level or a grid line. Colour is taken from
+   the material palette the studio builds with (concrete, linen, oxide,
+   steel) rather than from a screen palette.
+   ========================================================================== */
+
+@theme {
+  /* --- Surfaces: shadow ------------------------------------------------ */
+  --color-ink: #0b0b0b;
+  --color-ink-1: #131312;
+  --color-ink-2: #1c1c1a;
+  --color-graphite: #2b2b29;
+
+  /* --- Mid tones: notation --------------------------------------------- */
+  --color-steel: #56564f;
+  --color-concrete: #8b8981;
+  --color-linen: #c7c2b7;
+
+  /* --- Surfaces: light ------------------------------------------------- */
+  --color-paper: #efebe4;
+  --color-chalk: #f8f5f0;
+
+  /* --- The single accent: oxide. Used only to mark state, never to
+         decorate. ------------------------------------------------------- */
+  --color-oxide: #9b4e28;
+
+  /* --- Type ------------------------------------------------------------ */
+  --font-display: var(--font-archivo), "Helvetica Neue", Arial, sans-serif;
+  --font-text: var(--font-newsreader), Georgia, "Times New Roman", serif;
+  --font-note: var(--font-dm-mono), ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Notation — drawing annotation. Always uppercase, always tracked. */
+  --text-note: 0.6875rem;
+  --text-note--line-height: 1.25;
+  --text-note--letter-spacing: 0.14em;
+
+  --text-label: 0.75rem;
+  --text-label--line-height: 1.35;
+  --text-label--letter-spacing: 0.1em;
+
+  --text-body: 1rem;
+  --text-body--line-height: 1.65;
+
+  --text-lede: clamp(1.0625rem, 0.86rem + 0.85vw, 1.5rem);
+  --text-lede--line-height: 1.5;
+
+  --text-h4: clamp(1.125rem, 1.02rem + 0.45vw, 1.375rem);
+  --text-h4--line-height: 1.3;
+
+  --text-h3: clamp(1.5rem, 1.15rem + 1.5vw, 2.375rem);
+  --text-h3--line-height: 1.12;
+
+  --text-h2: clamp(2rem, 1.25rem + 3.2vw, 4.25rem);
+  --text-h2--line-height: 1.02;
+
+  --text-h1: clamp(2.5rem, 1.1rem + 6vw, 6.5rem);
+  --text-h1--line-height: 0.94;
+
+  --text-mega: clamp(3.25rem, -0.4rem + 15.5vw, 14rem);
+  --text-mega--line-height: 0.8;
+
+  /* --- Movement -------------------------------------------------------- */
+  /* datum: the long, settled arrival used for reveals and sequences */
+  --ease-datum: cubic-bezier(0.16, 1, 0.3, 1);
+  /* set: the short, deliberate move used for interface feedback */
+  --ease-set: cubic-bezier(0.22, 0.61, 0.36, 1);
+  /* section: symmetrical, used when something travels across the page */
+  --ease-section: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* ==========================================================================
+   LAYOUT MEASURES
+   Page margin widens with the viewport the way a drawing sheet border does.
+   ========================================================================== */
+
+:root {
+  --page-margin: 1.25rem;
+  --gutter: 0.75rem;
+  --columns: 6;
+  --nav-h: 3.75rem;
+  --rule: 1px;
+  --rule-color: color-mix(in srgb, currentColor 22%, transparent);
+}
+
+@media (min-width: 48rem) {
+  :root {
+    --page-margin: 2rem;
+    --gutter: 1rem;
+    --columns: 12;
+    --nav-h: 4.5rem;
+  }
+}
+
+@media (min-width: 80rem) {
+  :root {
+    --page-margin: 3rem;
+    --gutter: 1.25rem;
+  }
+}
+
+@media (min-width: 120rem) {
+  :root {
+    --page-margin: 4rem;
+    --gutter: 1.5rem;
+  }
+}
+
+/* Hairlines should stay hairlines on retina. */
+@media (min-resolution: 2dppx) {
+  :root {
+    --rule: 0.5px;
+  }
+}
+
+/* ==========================================================================
+   BASE
+   ========================================================================== */
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    /* Lenis owns smoothing. Never hand it to the browser as well. */
+    scroll-behavior: auto;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-ink);
+    color: var(--color-paper);
+    font-family: var(--font-display);
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Nothing on this site scrolls sideways. */
+    overflow-x: clip;
+  }
+
+  /* Lenis */
+  html.lenis,
+  html.lenis body {
+    height: auto;
+  }
+  .lenis.lenis-smooth {
+    scroll-behavior: auto !important;
+  }
+  .lenis.lenis-stopped {
+    overflow: hidden;
+  }
+
+  ::selection {
+    background-color: var(--color-oxide);
+    color: var(--color-chalk);
+  }
+
+  :focus-visible {
+    outline: var(--color-oxide) solid 2px;
+    outline-offset: 3px;
+  }
+
+  /* Headings inherit from composition, not from the browser. */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-weight: inherit;
+    font-size: inherit;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  p {
+    margin: 0;
+  }
+
+  img,
+  svg,
+  video,
+  canvas {
+    display: block;
+    max-width: 100%;
+  }
+
+  button {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  input,
+  textarea,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+}
+
+/* ==========================================================================
+   UTILITIES
+   ========================================================================== */
+
+/* Sheet border. Every page is set inside the same margin. */
+@utility frame {
+  padding-inline: var(--page-margin);
+}
+
+/* The structural grid. Twelve bays on desktop, six on handheld. */
+@utility bays {
+  display: grid;
+  grid-template-columns: repeat(var(--columns), minmax(0, 1fr));
+  column-gap: var(--gutter);
+}
+
+/* A hairline rule that takes its colour from the current text colour, so
+   it reads correctly on both ink and paper surfaces. */
+@utility rule-t {
+  border-top: var(--rule) solid var(--rule-color);
+}
+@utility rule-b {
+  border-bottom: var(--rule) solid var(--rule-color);
+}
+@utility rule-l {
+  border-left: var(--rule) solid var(--rule-color);
+}
+
+/* Notation: the annotation voice used on drawings. */
+@utility note {
+  font-family: var(--font-note);
+  font-size: var(--text-note);
+  line-height: var(--text-note--line-height);
+  letter-spacing: var(--text-note--letter-spacing);
+  text-transform: uppercase;
+  font-weight: 400;
+}
+
+/* Editorial prose. */
+@utility prose-k {
+  font-family: var(--font-text);
+  font-size: var(--text-lede);
+  line-height: 1.55;
+  letter-spacing: -0.005em;
+}
+
+/* Display type is set tight; large sizes need negative tracking to hold
+   together as an object on the page. */
+@utility display-tight {
+  font-family: var(--font-display);
+  letter-spacing: -0.035em;
+  font-weight: 500;
+}
+
+/* Content that exists for screen readers and search engines only. */
+@utility sr-only-k {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* ==========================================================================
+   SURFACES
+   A section declares which surface it is, and the navigation reads that
+   declaration to decide how it should be lit.
+   ========================================================================== */
+
+[data-surface="ink"] {
+  background-color: var(--color-ink);
+  color: var(--color-paper);
+  --rule-color: color-mix(in srgb, var(--color-linen) 20%, transparent);
+}
+
+[data-surface="paper"] {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  --rule-color: color-mix(in srgb, var(--color-graphite) 22%, transparent);
+}
+
+[data-surface="chalk"] {
+  background-color: var(--color-chalk);
+  color: var(--color-ink);
+  --rule-color: color-mix(in srgb, var(--color-graphite) 18%, transparent);
+}
+
+/* ==========================================================================
+   REVEALS
+   Elements that will be animated start hidden ONLY when JavaScript has
+   confirmed it can animate them. Without JS, or with reduced motion, the
+   content is simply present.
+   ========================================================================== */
+
+[data-reveal] {
+  will-change: auto;
+}
+
+html[data-anim="on"] [data-reveal="mask"] > * {
+  transform: translate3d(0, 110%, 0);
+}
+
+html[data-anim="on"] [data-reveal="fade"] {
+  opacity: 0;
+}
+
+/* Strokes that are drawn on. pathLength="1" normalises every path so one
+   dash length works regardless of the geometry. */
+html[data-anim="on"] [data-draw] path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+
+/* The opening the overture reveals through. Closed only when the sequence
+   that opens it is going to run. */
+html[data-anim="on"] [data-aperture] {
+  clip-path: inset(50% 46% 50% 46%);
+}
+
+/* ==========================================================================
+   REDUCED MOTION
+   The site must be beautiful standing still.
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  [data-reveal] > *,
+  [data-reveal] {
+    transform: none !important;
+    opacity: 1 !important;
+  }
+}
