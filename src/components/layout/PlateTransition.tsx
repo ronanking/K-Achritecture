@@ -126,16 +126,20 @@ export function PlateTransitionProvider({
  * first load is left alone — the fastest possible first paint matters more
  * than a flourish nobody asked for.
  */
+let hasMounted = false;
+
 export function ArrivalSheet() {
   const pathname = usePathname();
-  const first = useRef(true);
   const { active } = usePlateTransition();
+  // Read at render time, written after the first commit. The opening page load
+  // must not wait behind a curtain it did not ask for.
+  const isFirstLoad = !hasMounted;
 
   useEffect(() => {
-    first.current = false;
-  }, [pathname]);
+    hasMounted = true;
+  }, []);
 
-  if (first.current || active) return null;
+  if (isFirstLoad || active) return null;
 
   return (
     <motion.div

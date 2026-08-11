@@ -59,11 +59,6 @@ export function SiteHeader() {
     { dependencies: [pathname], revertOnUpdate: true },
   );
 
-  // Close the panel on navigation, and never leave the page locked.
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
-
   useEffect(() => {
     lockScroll(open);
     if (!open) return;
@@ -156,7 +151,9 @@ export function SiteHeader() {
         </div>
       </header>
 
-      <AnimatePresence>{open ? <MenuPanel /> : null}</AnimatePresence>
+      <AnimatePresence>
+        {open ? <MenuPanel onNavigate={() => setOpen(false)} /> : null}
+      </AnimatePresence>
     </>
   );
 }
@@ -200,7 +197,7 @@ function NavLink({
 }
 
 /** Full-viewport navigation for handheld. */
-function MenuPanel() {
+function MenuPanel({ onNavigate }: { onNavigate: () => void }) {
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -235,6 +232,7 @@ function MenuPanel() {
             >
               <Link
                 href={item.href}
+                onClick={onNavigate}
                 className="flex items-baseline justify-between py-5"
               >
                 <span className="display-tight text-h2">{item.label}</span>
