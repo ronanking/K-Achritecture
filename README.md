@@ -319,19 +319,15 @@ Put a platform rate limit in front of the route for anything stronger.
 `k-architecture` in the `ronankings-projects` team, production target, all
 thirteen routes serving.
 
-That first deployment was uploaded directly, so it is **not yet wired to this
-repository**. To get the intended **local → GitHub → Vercel** flow — pushes
-deploying themselves, and a preview URL for every branch and pull request —
-connect the repo once:
+The project is connected to this repository, so the flow is **local → GitHub →
+Vercel**: pushing to the production branch builds and deploys it, and every
+other branch gets its own preview URL. Nothing else needs configuring —
+framework, build command and output directory are all auto-detected, and there
+is no `vercel.json` to maintain.
 
-1. Open
-   [vercel.com/ronankings-projects/k-architecture/settings/git](https://vercel.com/ronankings-projects/k-architecture/settings/git)
-   → **Connect Git Repository** → `ronanking/K-Achritecture`, and set the
-   production branch. Framework, build command and output directory are all
-   auto-detected; there is no configuration to add.
-2. Add the environment variables from `.env.example` to Production and Preview.
-3. Push. From then on the deployed site is built from this repository rather
-   than from an upload, and every branch gets its own preview.
+The only setup left is optional: add the environment variables from
+`.env.example` to Production and Preview if you want the contact form to
+deliver enquiries itself rather than handing the visitor a prepared email.
 
 Note on canonical URLs: with `NEXT_PUBLIC_SITE_URL` unset, canonicals, Open
 Graph URLs and the sitemap all point at `www.karchitecture.com.au`. That is
