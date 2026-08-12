@@ -2,7 +2,7 @@
   "name": "SPS Condition Assessment",
   "short_name": "SPS Assess",
   "description": "Capture a sewerage pump station condition assessment on site and export the completed Word report.",
-  "start_url": "./",
+  "start_url": "index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",

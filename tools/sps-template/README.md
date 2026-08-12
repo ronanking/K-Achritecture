@@ -4,8 +4,14 @@ Writing fifteen sewerage pump station condition assessments by hand is fifteen
 passes through the same Word template. This is the same template, filled in on
 a phone at the station and handed back as a finished `.docx`.
 
-The app lives at **`/sps/`** — open it once on the iPhone, then Share → Add to
+The app lives at **`/sps`** — open it once on the iPhone, then Share → Add to
 Home Screen. After that it runs with no signal and no Safari chrome.
+
+`public/` has no directory index, so `/sps/index.html` is the only path that
+actually exists; `next.config.ts` redirects `/sps` onto it. Reaching the page
+at any other URL loads the markup with every relative asset resolved one
+directory too high — no styles, no scripts. `test-app.mjs` asserts against
+that now, and takes an `SPS_URL` so it can be pointed at a live deployment.
 
 ---
 

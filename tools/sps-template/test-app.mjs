@@ -8,6 +8,12 @@
  *     node tools/sps-template/test-app.mjs
  *
  * Set PW_CHROMIUM to point at an existing Chromium build instead.
+ *
+ * By default it serves public/sps itself. Set SPS_URL to test a real
+ * deployment instead — including a non-canonical URL, which is exactly how
+ * the missing-trailing-slash bug got through the first time:
+ *
+ *     SPS_URL=http://localhost:3000/sps node tools/sps-template/test-app.mjs
  */
 import { chromium } from "playwright";
 import { createServer } from "node:http";
@@ -42,8 +48,10 @@ const server = createServer(async (req, res) => {
   });
   res.end(await readFile(file));
 });
-await new Promise((r) => server.listen(0, r));
-const origin = `http://localhost:${server.address().port}`;
+const target = process.env.SPS_URL;
+if (!target) await new Promise((r) => server.listen(0, r));
+const origin = target || `http://localhost:${server.address().port}`;
+console.log(`target: ${origin}${target ? " (external)" : " (local static server)"}`);
 
 const browser = await chromium.launch({
   executablePath: process.env.PW_CHROMIUM || undefined,
@@ -78,10 +86,23 @@ const step = async (name, fn) => {
 
 console.log("running e2e");
 
-await page.goto(`${origin}/`, { waitUntil: "networkidle" });
+await page.goto(target ? origin : `${origin}/`, { waitUntil: "networkidle" });
 
 await step("empty state renders", async () => {
   await page.getByText("Nothing captured yet").waitFor({ timeout: 5000 });
+  // Styles and scripts have to have resolved. Served one directory up — at
+  // /sps instead of /sps/ — every relative asset 404s and the page renders as
+  // naked markup that still contains all the right words.
+  const styled = await page.evaluate(() => {
+    const bar = document.querySelector(".topbar");
+    return bar ? getComputedStyle(bar).display : "no topbar";
+  });
+  if (styled !== "flex") throw new Error(`stylesheet did not load (topbar display: ${styled})`);
+  const hiddenInput = await page.evaluate(() => {
+    const el = document.getElementById("camera");
+    return el ? getComputedStyle(el).position : "missing";
+  });
+  if (hiddenInput !== "absolute") throw new Error("file pickers are not hidden — app.css missing");
   await page.screenshot({ path: join(OUT, "01-empty.png") });
 });
 
@@ -276,7 +297,7 @@ await step("a deleted station stays deleted", async () => {
 });
 
 await browser.close();
-server.close();
+if (!target) server.close();
 
 console.log(`\ndownload: ${downloaded}`);
 if (problems.length) {

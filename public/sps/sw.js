@@ -5,10 +5,11 @@
  * here that goes stale between visits. A new CACHE name is what ships an
  * update; the old one is dropped on activate.
  */
-var CACHE = "sps-assess-v1";
+var CACHE = "sps-assess-v2";
 
+// index.html rather than "./" — the bare directory URL redirects, and caching
+// a redirected response is how you end up serving one from the cache offline.
 var SHELL = [
-  "./",
   "index.html",
   "app.css",
   "app.js",
