@@ -54,6 +54,16 @@ self.addEventListener("activate", function (event) {
   );
 });
 
+/* Only ever cache the app itself.
+ *
+ * Behind an access-controlled host — Vercel SSO, a corporate proxy, a captive
+ * portal — an expired session answers with 200 and a login page. Caching that
+ * over index.html would brick the tool in the field, so a response that has
+ * been redirected, or did not come from this origin, is used but never kept. */
+function isTheApp(response) {
+  return response && response.ok && !response.redirected && response.type === "basic";
+}
+
 self.addEventListener("fetch", function (event) {
   var request = event.request;
   if (request.method !== "GET") return;
@@ -70,7 +80,7 @@ self.addEventListener("fetch", function (event) {
         event.waitUntil(
           fetch(request)
             .then(function (response) {
-              if (response && response.ok) {
+              if (isTheApp(response)) {
                 return caches.open(CACHE).then(function (cache) {
                   return cache.put(request, response);
                 });
@@ -83,7 +93,7 @@ self.addEventListener("fetch", function (event) {
 
       return fetch(request)
         .then(function (response) {
-          if (response && response.ok) {
+          if (isTheApp(response)) {
             var copy = response.clone();
             caches.open(CACHE).then(function (cache) {
               cache.put(request, copy);
