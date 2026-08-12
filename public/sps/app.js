@@ -259,6 +259,74 @@
     return { done: done, total: total, ratio: total ? done / total : 0 };
   }
 
+  // ----------------------------------------------------------- the walk-through --
+
+  var stages = schema.stages || [{ id: "field", label: "On site" }];
+
+  function sectionsInStage(stageId) {
+    return schema.sections.filter(function (section) {
+      return (section.stage || "field") === stageId;
+    });
+  }
+
+  /* One flat, ordered list of everything that needs an answer in a stage.
+   *
+   * Focus mode walks this: a field, a rated asset, or a photo group is one
+   * screen each. The scrolling list renders the same things grouped by
+   * section — same items, same order, two ways of looking at them. */
+  function itemsInStage(stageId) {
+    var items = [];
+    sectionsInStage(stageId).forEach(function (section) {
+      (section.fields || []).forEach(function (field) {
+        items.push({ kind: "field", section: section, field: field, id: field.id });
+      });
+      (section.assets || []).forEach(function (asset) {
+        items.push({ kind: "asset", section: section, asset: asset, id: asset.id });
+      });
+      (section.groups || []).forEach(function (group) {
+        items.push({ kind: "group", section: section, group: group, id: group.id });
+      });
+    });
+    return items;
+  }
+
+  function itemLabel(item) {
+    if (item.kind === "asset") return item.asset.label;
+    if (item.kind === "group") return item.group.label;
+    return item.field.column
+      ? item.field.label + " — " + item.field.column
+      : item.field.label;
+  }
+
+  function itemAnswered(item, counts) {
+    counts = counts || photoCounts();
+    if (item.kind === "asset") {
+      return isFilled(current.station.values[item.asset.id + "_rating"]);
+    }
+    if (item.kind === "group") return !!counts[item.group.id];
+    if (item.field.type === "image") return !!counts[item.field.id];
+    return isFilled(current.station.values[item.field.id]);
+  }
+
+  function stageProgress(stageId) {
+    var counts = photoCounts();
+    var items = itemsInStage(stageId);
+    var done = items.filter(function (item) {
+      return itemAnswered(item, counts);
+    }).length;
+    return { done: done, total: items.length, items: items };
+  }
+
+  /* Where to drop someone who taps Resume: the first thing still unanswered,
+   * or the start if the stage is finished. */
+  function firstUnanswered(items) {
+    var counts = photoCounts();
+    for (var i = 0; i < items.length; i++) {
+      if (!itemAnswered(items[i], counts)) return i;
+    }
+    return 0;
+  }
+
   // ---------------------------------------------------------------- photos --
 
   /* Shrink to a sane long edge and re-encode as JPEG.
@@ -390,7 +458,9 @@
     view: "list",
     station: null,
     photos: [],
-    sectionId: schema.sections[0].id,
+    sectionId: "__walk",
+    stage: "field",
+    focus: null, // {index, jumping} while stepping one question at a time
     stations: [],
     counts: Object.create(null), // station id -> group id -> photo count
   };
@@ -664,7 +734,9 @@
     return store.getStation(id).then(function (station) {
       current.station = station;
       current.view = "station";
-      current.sectionId = current.sectionId || schema.sections[0].id;
+      current.sectionId = "__walk";
+      current.stage = "field";
+      current.focus = null;
       return refreshPhotos().then(function () {
         window.scrollTo(0, 0);
         render();
@@ -673,12 +745,16 @@
   }
 
   function backToList() {
+    // Back out of focus mode first — the arrow means "up one level", not
+    // "abandon the station".
+    if (current.focus) return Promise.resolve(exitFocus());
     return saveNow()
       .then(loadStations)
       .then(function () {
         current.view = "list";
         current.station = null;
         current.photos = [];
+        document.body.classList.remove("focusing");
         window.scrollTo(0, 0);
         render();
       });
@@ -688,14 +764,26 @@
     var station = current.station;
 
     backButton.classList.remove("hidden");
+    titleNode.firstChild.textContent = stationName(station);
+
+    // Focus mode takes the whole screen — no chips, no report shortcut, one
+    // question and the two buttons that move you off it.
+    if (current.focus) {
+      topAction.classList.add("hidden");
+      sectionBar.classList.add("hidden");
+      document.body.classList.add("focusing");
+      return renderFocus();
+    }
+
+    document.body.classList.remove("focusing");
     topAction.classList.remove("hidden");
     sectionBar.classList.remove("hidden");
-    titleNode.firstChild.textContent = stationName(station);
 
     renderSectionBar();
     updateProgressChrome();
 
     if (current.sectionId === "__report") return renderReport();
+    if (current.sectionId === "__walk") return renderWalkthrough();
 
     var section = sectionsById[current.sectionId];
     app.appendChild(el("h2", { class: "section", text: section.title }));
@@ -706,14 +794,338 @@
     else renderFields(section);
   }
 
+  // -- the walk-through index -----------------------------------------------
+
+  /* The landing screen for a station: which stage you are in, one button that
+   * puts you back where you stopped, and the sections as an index rather than
+   * a wall of inputs. */
+  function renderWalkthrough() {
+    var tabs = el("div", { class: "stagetabs" });
+    stages.forEach(function (stage) {
+      var progress = stageProgress(stage.id);
+      tabs.appendChild(
+        el(
+          "button",
+          {
+            class: "stagetab",
+            type: "button",
+            "aria-pressed": String(stage.id === current.stage),
+            onclick: function () {
+              current.stage = stage.id;
+              render();
+            },
+          },
+          [
+            el("span", { class: "stagename", text: stage.label }),
+            el("span", { class: "stagecount", text: progress.done + " / " + progress.total }),
+          ]
+        )
+      );
+    });
+    app.appendChild(tabs);
+
+    var stage = stages.filter(function (s) {
+      return s.id === current.stage;
+    })[0];
+    var progress = stageProgress(current.stage);
+    if (stage && stage.hint) app.appendChild(el("p", { class: "lede", text: stage.hint }));
+
+    var startAt = firstUnanswered(progress.items);
+    var complete = progress.done === progress.total;
+    var next = progress.items[startAt];
+
+    app.appendChild(
+      el(
+        "button",
+        {
+          class: "bigbtn walkbtn",
+          type: "button",
+          onclick: function () {
+            enterFocus(startAt);
+          },
+        },
+        [
+          el("span", {
+            class: "walkverb",
+            text: complete
+              ? "Go through it again"
+              : progress.done
+                ? "Resume"
+                : "Start",
+          }),
+          el("span", {
+            class: "walknext",
+            text: complete
+              ? progress.total + " of " + progress.total + " answered"
+              : "next: " + itemLabel(next) + " · " + (startAt + 1) + " of " + progress.total,
+          }),
+        ]
+      )
+    );
+
+    var index = el("div", { class: "card sectionindex" });
+    sectionsInStage(current.stage).forEach(function (section) {
+      var part = progressOf(current.station, section, photoCounts());
+      var offset = progress.items.findIndex(function (item) {
+        return item.section.id === section.id;
+      });
+      index.appendChild(
+        el(
+          "button",
+          {
+            class: "indexrow",
+            type: "button",
+            onclick: function () {
+              enterFocus(offset < 0 ? 0 : offset);
+            },
+          },
+          [
+            el("span", {
+              class: "mark " + (part.done === part.total ? "ok" : "todo"),
+              text: part.done === part.total ? "✓" : "·",
+            }),
+            el("span", { class: "indexname", text: section.title }),
+            el("span", { class: "count", text: part.done + "/" + part.total }),
+          ]
+        )
+      );
+    });
+    app.appendChild(index);
+
+    app.appendChild(
+      el("p", {
+        class: "note",
+        text:
+          "One question at a time, swipe or tap to move. Anything you skip stays " +
+          "blank in the report, so you can walk the site in whatever order suits it.",
+      })
+    );
+  }
+
+  // -- focus mode -----------------------------------------------------------
+
+  function enterFocus(index) {
+    var items = itemsInStage(current.stage);
+    current.focus = { index: Math.max(0, Math.min(index, items.length - 1)) };
+    window.scrollTo(0, 0);
+    render();
+  }
+
+  function exitFocus() {
+    current.focus = null;
+    current.sectionId = "__walk";
+    window.scrollTo(0, 0);
+    render();
+  }
+
+  function stepFocus(delta) {
+    var items = itemsInStage(current.stage);
+    var next = current.focus.index + delta;
+    if (next < 0) return;
+    if (next >= items.length) return exitFocus();
+    current.focus.index = next;
+    // Blur first, or iOS keeps the keyboard up over the next question.
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    window.scrollTo(0, 0);
+    render();
+  }
+
+  function renderFocus() {
+    var items = itemsInStage(current.stage);
+    var index = Math.min(current.focus.index, items.length - 1);
+    var item = items[index];
+    if (!item) return exitFocus();
+
+    var screen = el("div", { class: "focus" });
+
+    // -- header: where you are, and the way out
+    var counts = photoCounts();
+    var done = items.filter(function (each) {
+      return itemAnswered(each, counts);
+    }).length;
+
+    screen.appendChild(
+      el("div", { class: "focushead" }, [
+        el("button", {
+          class: "focusexit",
+          type: "button",
+          "aria-label": "Leave focus mode",
+          text: "✕",
+          onclick: exitFocus,
+        }),
+        el("div", { class: "focuswhere" }, [
+          el("span", { class: "focussection", text: item.section.title }),
+          (focusCountNode = el("span", {
+            class: "focuscount",
+            text: index + 1 + " of " + items.length + " · " + done + " answered",
+          })),
+        ]),
+        el("button", {
+          class: "focusexit",
+          type: "button",
+          "aria-label": "Jump to another question",
+          text: "☰",
+          onclick: function () {
+            current.focus.jumping = true;
+            render();
+          },
+        }),
+      ])
+    );
+
+    var bar = el("div", { class: "focusbar" });
+    bar.appendChild(
+      el("i", { style: "width:" + Math.round(((index + 1) / items.length) * 100) + "%" })
+    );
+    screen.appendChild(bar);
+
+    if (current.focus.jumping) {
+      screen.appendChild(renderJumpList(items, index));
+      app.appendChild(screen);
+      return;
+    }
+
+    // -- the one question
+    var body = el("div", { class: "focusbody", "data-rating": "" });
+    body.appendChild(el("h2", { class: "focusq", text: itemLabel(item) }));
+
+    if (item.kind === "asset") {
+      body.setAttribute("data-rating", current.station.values[item.asset.id + "_rating"] || "");
+      body.appendChild(
+        el("p", { class: "focushint", text: "How would you rate its condition?" })
+      );
+      assetControls(item.asset, body).forEach(function (node) {
+        body.appendChild(node);
+      });
+    } else if (item.kind === "group") {
+      body.appendChild(
+        el("p", { class: "focushint", text: "Photograph it for Appendix 1." })
+      );
+      body.appendChild(renderShots(item.group.id, item.group.label));
+    } else {
+      if (item.field.help) {
+        body.appendChild(el("p", { class: "focushint", text: item.field.help }));
+      }
+      var field = renderField(item.field);
+      // The label is already the question, in full size, above.
+      var label = field.querySelector("label");
+      if (label) field.removeChild(label);
+      body.appendChild(field);
+    }
+
+    screen.appendChild(body);
+
+    // -- thumb bar
+    screen.appendChild(
+      el("div", { class: "focusnav" }, [
+        el("button", {
+          class: "navbtn",
+          type: "button",
+          text: "‹ Back",
+          disabled: index === 0,
+          onclick: function () {
+            stepFocus(-1);
+          },
+        }),
+        el("button", {
+          class: "navbtn primary",
+          type: "button",
+          text: index === items.length - 1 ? "Done" : "Next ›",
+          onclick: function () {
+            stepFocus(1);
+          },
+        }),
+      ])
+    );
+
+    wireSwipe(screen);
+    app.appendChild(screen);
+  }
+
+  function renderJumpList(items, currentIndex) {
+    var counts = photoCounts();
+    var list = el("div", { class: "focusjump" });
+    var lastSection = null;
+
+    items.forEach(function (item, i) {
+      if (item.section.id !== lastSection) {
+        lastSection = item.section.id;
+        list.appendChild(el("h3", { class: "jumpsection", text: item.section.title }));
+      }
+      var answered = itemAnswered(item, counts);
+      list.appendChild(
+        el(
+          "button",
+          {
+            class: "jumprow",
+            type: "button",
+            "aria-current": String(i === currentIndex),
+            onclick: function () {
+              current.focus.jumping = false;
+              current.focus.index = i;
+              render();
+            },
+          },
+          [
+            el("span", { class: "mark " + (answered ? "ok" : "todo"), text: answered ? "✓" : "·" }),
+            el("span", { class: "jumpname", text: itemLabel(item) }),
+            el("span", { class: "count", text: String(i + 1) }),
+          ]
+        )
+      );
+    });
+    return list;
+  }
+
+  /* Swipe between questions. Ignored when the gesture starts on something the
+   * finger is meant to be doing something else with — a text box being
+   * scrolled, the photo strip being panned. */
+  function wireSwipe(node) {
+    var startX = 0;
+    var startY = 0;
+    var tracking = false;
+
+    node.addEventListener(
+      "touchstart",
+      function (event) {
+        if (event.touches.length !== 1) return;
+        var target = event.target;
+        if (target.closest("textarea, input, .shots, .focusjump")) return;
+        tracking = true;
+        startX = event.touches[0].clientX;
+        startY = event.touches[0].clientY;
+      },
+      { passive: true }
+    );
+
+    node.addEventListener(
+      "touchend",
+      function (event) {
+        if (!tracking) return;
+        tracking = false;
+        var touch = event.changedTouches[0];
+        var dx = touch.clientX - startX;
+        var dy = touch.clientY - startY;
+        if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+        stepFocus(dx < 0 ? 1 : -1);
+      },
+      { passive: true }
+    );
+  }
+
   var tallyNodes = Object.create(null);
+  var focusCountNode = null;
 
   function renderSectionBar() {
     sectionBar.textContent = "";
     tallyNodes = Object.create(null);
     var counts = photoCounts();
 
-    schema.sections.concat([{ id: "__report", title: "Report" }]).forEach(function (section) {
+    var chips = [{ id: "__walk", title: "Walk-through" }]
+      .concat(sectionsInStage(current.stage))
+      .concat([{ id: "__report", title: "Report" }]);
+
+    chips.forEach(function (section) {
       var chip = el("button", {
         class: "chip",
         type: "button",
@@ -725,7 +1137,7 @@
         },
       });
       chip.appendChild(document.createTextNode(section.title));
-      if (section.id !== "__report") {
+      if (section.id !== "__report" && section.id !== "__walk") {
         var part = progressOf(current.station, section, counts);
         var tally = el("span", { class: "tally", text: part.done + "/" + part.total });
         tallyNodes[section.id] = tally;
@@ -890,20 +1302,30 @@
   }
 
   function renderAsset(asset, index, total) {
-    var values = current.station.values;
-    var ratingId = asset.id + "_rating";
-    var commentId = asset.id + "_comment";
     var card = el("div", {
       class: "card assetcard",
-      "data-rating": values[ratingId] || "",
+      "data-rating": current.station.values[asset.id + "_rating"] || "",
     });
-
     card.appendChild(
       el("h3", {}, [
         el("span", { text: asset.label }),
         el("span", { class: "idx", text: index + 1 + "/" + total }),
       ])
     );
+    assetControls(asset, card).forEach(function (node) {
+      card.appendChild(node);
+    });
+    return card;
+  }
+
+  /* The rating buttons, the plain-English meaning, the comment and the photo
+   * strip. Shared by the scrolling list and by focus mode, which lays the same
+   * controls out one to a screen. `host` gets the data-rating attribute that
+   * colours the surround. */
+  function assetControls(asset, host) {
+    var values = current.station.values;
+    var ratingId = asset.id + "_rating";
+    var commentId = asset.id + "_comment";
 
     var meaning = el("p", { class: "ratingmeaning" });
     function describe(value) {
@@ -932,7 +1354,7 @@
           onclick: function () {
             var next = values[ratingId] === rating.value ? "" : rating.value;
             setValue(ratingId, next);
-            card.setAttribute("data-rating", next);
+            host.setAttribute("data-rating", next);
             ratings.querySelectorAll(".rating").forEach(function (button) {
               button.setAttribute(
                 "aria-pressed",
@@ -944,9 +1366,7 @@
         })
       );
     });
-    card.appendChild(ratings);
     describe(values[ratingId] || "");
-    card.appendChild(meaning);
 
     var comment = el("textarea", {
       rows: 2,
@@ -961,10 +1381,13 @@
     requestAnimationFrame(function () {
       autoGrow(comment);
     });
-    card.appendChild(el("div", { class: "field" }, [comment]));
 
-    card.appendChild(renderShots(asset.id, asset.label));
-    return card;
+    return [
+      ratings,
+      meaning,
+      el("div", { class: "field" }, [comment]),
+      renderShots(asset.id, asset.label),
+    ];
   }
 
   /* Rating an asset or typing in a field deliberately does not re-render — the
@@ -973,6 +1396,20 @@
   function updateProgressChrome() {
     if (!current.station || current.view !== "station") return;
     var counts = photoCounts();
+
+    if (current.focus) {
+      // Answering the question on screen should move the counter above it.
+      var items = itemsInStage(current.stage);
+      var done = items.filter(function (each) {
+        return itemAnswered(each, counts);
+      }).length;
+      if (focusCountNode) {
+        focusCountNode.textContent =
+          current.focus.index + 1 + " of " + items.length + " · " + done + " answered";
+      }
+      return;
+    }
+
     var progress = overallProgress(current.station, counts);
     subtitleNode.textContent =
       progress.done + " of " + progress.total + " filled · saved automatically";
@@ -1418,6 +1855,32 @@
   window.addEventListener("pagehide", function () {
     if (current.station) saveNow();
   });
+
+  // Arrow keys step through focus mode on anything with a keyboard, as long as
+  // the arrow is not busy moving a caret.
+  window.addEventListener("keydown", function (event) {
+    if (!current.focus || current.focus.jumping) return;
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    var tag = (document.activeElement && document.activeElement.tagName) || "";
+    if (tag === "TEXTAREA" || tag === "INPUT") return;
+    if (event.key === "ArrowRight") stepFocus(1);
+    else if (event.key === "ArrowLeft") stepFocus(-1);
+    else if (event.key === "Escape") exitFocus();
+  });
+
+  /* Focus mode is sized to the visible viewport rather than the window, so the
+   * Next button stays above the iOS keyboard instead of behind it. */
+  (function trackViewport() {
+    var viewport = window.visualViewport;
+    if (!viewport) return;
+    var apply = function () {
+      document.documentElement.style.setProperty("--vvh", viewport.height + "px");
+    };
+    viewport.addEventListener("resize", apply);
+    viewport.addEventListener("scroll", apply);
+    apply();
+  })();
+
   wirePickers();
 
   requestDurableStorage().catch(function () {});

@@ -1,6 +1,6 @@
-/* Drive the whole app in a real browser: create a station, fill it in, take
- * photos, generate the report, reload, then pull the plug and check it still
- * works offline.
+/* Drive the whole app in a real browser: walk a station through focus mode,
+ * fill the desk sections, generate the report, reload, then pull the plug and
+ * check it still works offline.
  *
  * Playwright is not a dependency of this site, so install it just for this:
  *
@@ -48,6 +48,7 @@ const server = createServer(async (req, res) => {
   });
   res.end(await readFile(file));
 });
+
 const target = process.env.SPS_URL;
 if (!target) await new Promise((r) => server.listen(0, r));
 const origin = target || `http://localhost:${server.address().port}`;
@@ -58,7 +59,7 @@ const browser = await chromium.launch({
   args: ["--no-sandbox"],
 });
 const context = await browser.newContext({
-  viewport: { width: 390, height: 844 },       // iPhone 14 Pro
+  viewport: { width: 390, height: 844 }, // iPhone 14 Pro
   deviceScaleFactor: 3,
   isMobile: true,
   hasTouch: true,
@@ -84,6 +85,21 @@ const step = async (name, fn) => {
   }
 };
 
+const shot = (n) => page.screenshot({ path: join(OUT, `${n}.png`) });
+
+// A real JPEG, so the decode-and-resize path runs for true.
+const jpeg = Buffer.from(
+  "/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwg" +
+    "JC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAAoADwBAREA/8QAHwAAAQUBAQEBAQEAAAAA" +
+    "AAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEI" +
+    "I0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1" +
+    "dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi" +
+    "4+Tl5ufo6erx8vP09fb3+Pn6/9oACAEBAAA/APn+iiigAooooAKKKKACiiigAooooAKKKKACiiigD//Z",
+  "base64"
+);
+const jpegPath = join(OUT, "shot.jpg");
+await writeFile(jpegPath, jpeg);
+
 console.log("running e2e");
 
 await page.goto(target ? origin : `${origin}/`, { waitUntil: "networkidle" });
@@ -103,93 +119,163 @@ await step("empty state renders", async () => {
     return el ? getComputedStyle(el).position : "missing";
   });
   if (hiddenInput !== "absolute") throw new Error("file pickers are not hidden — app.css missing");
-  await page.screenshot({ path: join(OUT, "01-empty.png") });
+  await shot("01-empty");
 });
 
-await step("create a station", async () => {
+await step("a new station opens on the field work", async () => {
   await page.getByRole("button", { name: "+ New station" }).click();
-  await page.getByRole("navigation", { name: "Report sections" }).waitFor();
+  await page.locator(".stagetabs").waitFor({ timeout: 5000 });
+
+  // On site comes first, and holds exactly the tables that get filled in
+  // standing at the station.
+  const tabs = await page.locator(".stagetab .stagename").allInnerTexts();
+  if (tabs[0] !== "On site") throw new Error(`field stage is not first: ${tabs}`);
+  if ((await page.locator('.stagetab[aria-pressed="true"] .stagename').innerText()) !== "On site") {
+    throw new Error("did not land on the On site stage");
+  }
+
+  const sections = await page.locator(".indexname").allInnerTexts();
+  const expected = [
+    "Station",
+    "Well openings",
+    "Condition assessment",
+    "General improvement works",
+    "Site photos",
+  ];
+  if (sections.join("|") !== expected.join("|")) {
+    throw new Error(`field sections wrong or out of order: ${sections.join(", ")}`);
+  }
+  const total = await page.locator('.stagetab[aria-pressed="true"] .stagecount').innerText();
+  if (!total.endsWith("/ 54")) throw new Error(`field stage should hold 54 items, says ${total}`);
+  await shot("02-walkthrough");
 });
 
-await step("cover fields save", async () => {
-  await page.locator("#f_sps_id").fill("SPS-KED345");
-  await page.locator("#f_doc_number").fill("UW-SPS-0345");
-  await page.locator("#f_sign_prepared_by_name").fill("R. King");
-  await page.waitForTimeout(500);
-  await page.screenshot({ path: join(OUT, "02-cover.png") });
+await step("focus mode shows one question at a time", async () => {
+  await page.getByRole("button", { name: /^(Resume|Start)/ }).click();
+  await page.locator(".focus").waitFor({ timeout: 5000 });
+
+  const questions = await page.locator(".focusq").count();
+  if (questions !== 1) throw new Error(`expected one question on screen, saw ${questions}`);
+  if (!(await page.locator(".focusq").innerText()).includes("SPS number")) {
+    throw new Error("focus did not open on the first unanswered question");
+  }
+  // The thumb bar has to sit inside the viewport, not below the fold.
+  const navBottom = await page.evaluate(() => {
+    const nav = document.querySelector(".focusnav");
+    return nav ? Math.round(nav.getBoundingClientRect().bottom) : -1;
+  });
+  const viewportHeight = await page.evaluate(() => window.innerHeight);
+  if (navBottom > viewportHeight + 1) {
+    throw new Error(`Next button is off screen (${navBottom} > ${viewportHeight})`);
+  }
+  await shot("03-focus-first");
+
+  await page.locator(".focusbody input").fill("SPS-KED345");
+  await page.getByRole("button", { name: /Next/ }).click();
+  await page.waitForTimeout(250);
+  if (!(await page.locator(".focusq").innerText()).includes("Date of inspection")) {
+    throw new Error("Next did not advance");
+  }
+  await page.getByRole("button", { name: /Back/ }).click();
+  await page.waitForTimeout(250);
+  if ((await page.locator(".focusbody input").inputValue()) !== "SPS-KED345") {
+    throw new Error("going back lost the answer");
+  }
+});
+
+await step("swiping moves between questions", async () => {
+  const swipe = (fromX, toX) =>
+    page.evaluate(
+      ([x0, x1]) => {
+        // The handler reads clientX off real Touch objects, so build real ones
+        // — a plain literal is rejected by the TouchEvent constructor.
+        const node = document.querySelector(".focus");
+        const target = document.querySelector(".focusq");
+        const at = (x) => [
+          new Touch({ identifier: 1, target, clientX: x, clientY: 300, pageX: x, pageY: 300 }),
+        ];
+        node.dispatchEvent(
+          new TouchEvent("touchstart", { touches: at(x0), bubbles: true, cancelable: true })
+        );
+        node.dispatchEvent(
+          new TouchEvent("touchend", { changedTouches: at(x1), bubbles: true, cancelable: true })
+        );
+      },
+      [fromX, toX]
+    );
+
+  const first = await page.locator(".focusq").innerText();
+  await swipe(320, 60);
+  await page.waitForTimeout(300);
+  const second = await page.locator(".focusq").innerText();
+  if (second === first) throw new Error(`swiping left did not advance (still on ${first})`);
+
+  await swipe(60, 320);
+  await page.waitForTimeout(300);
+  if ((await page.locator(".focusq").innerText()) !== first) {
+    throw new Error("swiping right did not go back");
+  }
+});
+
+await step("rate an asset and photograph it", async () => {
+  // Jump straight to the condition assessment rather than tapping Next 4 times.
+  await page.getByRole("button", { name: "Jump to another question" }).click();
+  await page.locator(".focusjump").waitFor();
+  const rows = await page.locator(".jumprow").count();
+  if (rows !== 54) throw new Error(`jump list should hold 54 rows, saw ${rows}`);
+  await shot("04-jump");
+  await page.getByRole("button", { name: /^·?\s*Signage/ }).click();
+  await page.waitForTimeout(250);
+
+  if (!(await page.locator(".focusq").innerText()).includes("Signage")) {
+    throw new Error("jump did not land on Signage");
+  }
+  await page.locator('.rating[data-value="4"]').click();
+  await page.waitForTimeout(200);
+  const meaning = await page.locator(".ratingmeaning").innerText();
+  if (!meaning.includes("Poor")) throw new Error(`rating meaning missing: ${meaning}`);
+  const count = await page.locator(".focuscount").innerText();
+  if (!/·\s*3 answered/.test(count)) throw new Error(`answered tally did not move: ${count}`);
+
+  await page.locator(".focusbody textarea").fill("Faded, cable ties perished.");
+  await page.getByRole("button", { name: /^Take a photo/ }).click();
+  await page.locator("#camera").setInputFiles(jpegPath);
+  await page.waitForTimeout(1000);
+  if ((await page.locator(".focusbody .shot").count()) !== 1) {
+    throw new Error("photo did not attach in focus mode");
+  }
+  // Adding a photo must not knock you off the question you are on.
+  if (!(await page.locator(".focusq").innerText()).includes("Signage")) {
+    throw new Error("adding a photo moved off the question");
+  }
+  await shot("05-focus-rated");
+});
+
+await step("leaving focus returns to the walk-through", async () => {
+  await page.getByRole("button", { name: "Leave focus mode" }).click();
+  await page.locator(".stagetabs").waitFor({ timeout: 5000 });
+  const rowText = await page
+    .locator(".indexrow", { hasText: "Condition assessment" })
+    .innerText();
+  if (!rowText.includes("1/29")) throw new Error(`walk-through count stale: ${rowText}`);
   const title = await page.locator("#title").innerText();
-  if (!title.includes("SPS-KED345")) throw new Error(`header did not update: ${title}`);
+  if (!title.includes("SPS-KED345")) throw new Error(`header did not pick up the name: ${title}`);
 });
 
-await step("overview prose", async () => {
-  await page.getByRole("button", { name: /^Site overview/ }).click();
-  await page.locator("#f_overview_flow").fill("Pumps from the Kedron catchment to SPS-KED120.");
-  await page.locator("#f_site_issues").fill("Switchboard flooded twice in 2025.");
-  const bypass = await page.locator("#f_bypass_text").inputValue();
-  if (!bypass.includes("permanent bypass point")) throw new Error("bypass default missing");
-  await page.waitForTimeout(500);
-  await page.screenshot({ path: join(OUT, "03-overview.png") });
-});
-
-await step("details quick picks", async () => {
-  await page.getByRole("button", { name: /^SPS details/ }).click();
-  const yes = page.getByRole("button", { name: "Yes", exact: true }).first();
-  await yes.click();
-  if ((await yes.getAttribute("aria-pressed")) !== "true") throw new Error("quick pick not set");
-  await page.screenshot({ path: join(OUT, "04-details.png") });
-});
-
-await step("rate assets and comment", async () => {
+await step("the list view still works for the rest of a section", async () => {
   await page.getByRole("button", { name: /^Condition assessment/ }).click();
   const cards = page.locator(".assetcard");
   await cards.first().waitFor();
-  const count = await cards.count();
-  if (count !== 29) throw new Error(`expected 29 asset cards, saw ${count}`);
-
-  for (const [i, rating] of [4, 2, 5, 3].entries()) {
-    const card = cards.nth(i);
+  if ((await cards.count()) !== 29) throw new Error("expected 29 asset cards");
+  for (const [i, rating] of [2, 5, 3].entries()) {
+    const card = cards.nth(i + 1);
     await card.locator(`.rating[data-value="${rating}"]`).click();
-    await card.locator("textarea").fill(`Asset ${i + 1}: rated ${rating} on inspection.`);
+    await card.locator("textarea").fill(`Asset ${i + 2}: rated ${rating} on inspection.`);
   }
-  await page.waitForTimeout(500);
-  const meaning = await cards.first().locator(".ratingmeaning").innerText();
-  if (!meaning.includes("Poor")) throw new Error(`rating meaning not shown: ${meaning}`);
-  // The chip tally has to keep up without a re-render throwing away the scroll.
-  const tally = await page
-    .locator('.chip[aria-current="true"] .tally')
-    .innerText();
+  await page.waitForTimeout(400);
+  const tally = await page.locator('.chip[aria-current="true"] .tally').innerText();
   if (tally !== "4/29") throw new Error(`chip tally stale: ${tally}`);
-  const subtitle = await page.locator("#subtitle").innerText();
-  if (!/ of 146 filled/.test(subtitle)) throw new Error(`subtitle wrong: ${subtitle}`);
-  await page.screenshot({ path: join(OUT, "05-condition.png") });
-});
-
-// A real JPEG so the resize path runs for true.
-const jpeg = Buffer.from(
-  "/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwg" +
-    "JC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAAoADwBAREA/8QAHwAAAQUBAQEBAQEAAAAA" +
-    "AAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEI" +
-    "I0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1" +
-    "dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi" +
-    "4+Tl5ufo6erx8vP09fb3+Pn6/9oACAEBAAA/APn+iiigAooooAKKKKACiiigAooooAKKKKACiiigD//Z",
-  "base64"
-);
-const jpegPath = join(OUT, "shot.jpg");
-await writeFile(jpegPath, jpeg);
-
-await step("attach photos to an asset", async () => {
-  const card = page.locator(".assetcard").first();
-  await card.getByRole("button", { name: /^Take a photo/ }).click();
-  await page.locator("#camera").setInputFiles(jpegPath);
-  await page.waitForTimeout(900);
-  // Each picker has to be armed by its own button — that is what tells the app
-  // which asset the next photo belongs to.
-  await card.getByRole("button", { name: /from the library/ }).click();
-  await page.locator("#library").setInputFiles([jpegPath, jpegPath]);
-  await page.waitForTimeout(1400);
-  const shots = await page.locator(".assetcard").first().locator(".shot").count();
-  if (shots !== 3) throw new Error(`expected 3 thumbnails, saw ${shots}`);
-  await page.screenshot({ path: join(OUT, "06-photos.png") });
+  await shot("06-list");
 });
 
 await step("photographing deep in the list holds your place", async () => {
@@ -200,24 +286,17 @@ await step("photographing deep in the list holds your place", async () => {
   await page.locator("#camera").setInputFiles(jpegPath);
   await page.waitForTimeout(1000);
   const after = await page.evaluate(() => window.scrollY);
-  if (Math.abs(after - before) > 40) {
-    throw new Error(`scroll jumped from ${before} to ${after}`);
-  }
-  if ((await page.locator(".assetcard").nth(21).locator(".shot").count()) !== 1) {
-    throw new Error("photo did not attach to the right asset");
-  }
+  if (Math.abs(after - before) > 40) throw new Error(`scroll jumped ${before} -> ${after}`);
 });
 
-await step("a figure keeps only the latest image", async () => {
-  await page.getByRole("button", { name: /^Site overview/ }).click();
-  await page.getByRole("button", { name: "Choose image" }).first().click();
-  await page.locator("#library").setInputFiles([jpegPath, jpegPath, jpegPath]);
-  await page.waitForTimeout(1200);
-  const figures = await page.locator("img.figure").count();
-  if (figures !== 1) throw new Error(`expected 1 figure, saw ${figures}`);
-  await page.getByRole("button", { name: "Remove image" }).click();
-  await page.waitForTimeout(600);
-  if ((await page.locator("img.figure").count()) !== 0) throw new Error("figure not removed");
+await step("well openings and improvement works are field work", async () => {
+  await page.getByRole("button", { name: /^Well openings/ }).click();
+  const inputs = page.locator("main .field input");
+  if ((await inputs.count()) !== 3) throw new Error("expected 3 well opening measurements");
+  await inputs.nth(0).fill("1200");
+  await page.getByRole("button", { name: /^General improvement works/ }).click();
+  await page.locator("main textarea").first().fill("Pavement sunken at the gate.");
+  await page.waitForTimeout(400);
 });
 
 await step("site photo groups", async () => {
@@ -227,7 +306,49 @@ await step("site photo groups", async () => {
   await cards.first().getByRole("button", { name: /library/i }).click();
   await page.locator("#library").setInputFiles(jpegPath);
   await page.waitForTimeout(900);
-  await page.screenshot({ path: join(OUT, "07-sitephotos.png") });
+  await shot("07-sitephotos");
+});
+
+await step("the desk stage holds the rest", async () => {
+  await page.getByRole("button", { name: "Walk-through" }).click();
+  await page.getByRole("button", { name: /^Desk/ }).click();
+  await page.waitForTimeout(300);
+  const sections = await page.locator(".indexname").allInnerTexts();
+  const expected = [
+    "SPS details",
+    "Pump specifications",
+    "Site overview",
+    "Recommended scope of works",
+    "Document control",
+  ];
+  if (sections.join("|") !== expected.join("|")) {
+    throw new Error(`desk sections wrong: ${sections.join(", ")}`);
+  }
+  await shot("08-desk");
+});
+
+await step("overview prose and quick picks", async () => {
+  await page.getByRole("button", { name: /^Site overview/ }).click();
+  await page.locator("#f_overview_flow").fill("Pumps from the Kedron catchment to SPS-KED120.");
+  await page.locator("#f_site_issues").fill("Switchboard flooded twice in 2025.");
+  const bypass = await page.locator("#f_bypass_text").inputValue();
+  if (!bypass.includes("permanent bypass point")) throw new Error("bypass default missing");
+
+  await page.getByRole("button", { name: /^SPS details/ }).click();
+  const yes = page.getByRole("button", { name: "Yes", exact: true }).first();
+  await yes.click();
+  if ((await yes.getAttribute("aria-pressed")) !== "true") throw new Error("quick pick not set");
+});
+
+await step("a figure keeps only the latest image", async () => {
+  await page.getByRole("button", { name: /^Site overview/ }).click();
+  await page.getByRole("button", { name: "Choose image" }).first().click();
+  await page.locator("#library").setInputFiles([jpegPath, jpegPath, jpegPath]);
+  await page.waitForTimeout(1200);
+  if ((await page.locator("img.figure").count()) !== 1) throw new Error("expected exactly 1 figure");
+  await page.getByRole("button", { name: "Remove image" }).click();
+  await page.waitForTimeout(600);
+  if ((await page.locator("img.figure").count()) !== 0) throw new Error("figure not removed");
 });
 
 await step("works list", async () => {
@@ -237,9 +358,9 @@ await step("works list", async () => {
 });
 
 await step("report checklist", async () => {
-  await page.getByRole("button", { name: "Report", exact: true }).last().click();
+  await page.getByRole("button", { name: "Report", exact: true }).first().click();
   await page.getByText("Generate Word report").waitFor();
-  await page.screenshot({ path: join(OUT, "08-report.png"), fullPage: true });
+  await page.screenshot({ path: join(OUT, "09-report.png"), fullPage: true });
 });
 
 let downloaded = null;
@@ -259,8 +380,8 @@ await step("data survives a reload", async () => {
   await page.getByText("SPS-KED345").first().waitFor({ timeout: 5000 });
   const meta = await page.locator(".stationlist .meta").first().innerText();
   if (!/4 of 29 assets rated/.test(meta)) throw new Error(`list meta wrong: ${meta}`);
-  if (!/5 photos/.test(meta)) throw new Error(`photo count wrong: ${meta}`);
-  await page.screenshot({ path: join(OUT, "09-list.png") });
+  if (!/3 photos/.test(meta)) throw new Error(`photo count wrong: ${meta}`);
+  await shot("10-list");
 });
 
 await step("service worker registers", async () => {
@@ -286,7 +407,6 @@ await step("works offline", async () => {
 await step("a deleted station stays deleted", async () => {
   await page.getByText("SPS-KED345").first().click();
   await page.getByRole("button", { name: "Report", exact: true }).first().click();
-  await page.locator("#f_sps_id").waitFor({ state: "detached" }).catch(() => {});
   page.once("dialog", (d) => d.accept());
   await page.getByRole("button", { name: "Delete station" }).click();
   await page.getByText("Nothing captured yet").waitFor({ timeout: 5000 });

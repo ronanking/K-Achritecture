@@ -484,6 +484,241 @@ h2.section {
 .banner.bad { border-color: var(--danger); color: var(--danger); }
 .banner.good { border-color: var(--ok); color: var(--ok); }
 
+/* ------------------------------------------------------- the walk-through */
+
+.stagetabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.stagetab {
+  min-height: 58px;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  border: 1.5px solid var(--line);
+  background: var(--card);
+  color: var(--ink-soft);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+}
+
+.stagetab[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
+.stagename { font-size: 15.5px; font-weight: 620; }
+.stagecount { font-size: 13px; font-variant-numeric: tabular-nums; opacity: 0.8; }
+
+.walkbtn {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px;
+  min-height: 68px;
+  margin-bottom: 14px;
+}
+
+.walkverb { font-size: 18px; font-weight: 660; }
+.walknext { font-size: 13.5px; font-weight: 450; opacity: 0.85; }
+
+.sectionindex { padding: 4px 14px; }
+
+.indexrow {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--tap);
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  background: none;
+  text-align: left;
+  font-size: 15.5px;
+}
+
+.indexrow:last-child { border-bottom: 0; }
+.indexname { flex: 1; min-width: 0; }
+
+/* -------------------------------------------------------------- focus mode */
+
+/* One question, full screen. Sized to the visual viewport so the thumb bar
+ * rides above the iOS keyboard rather than hiding behind it. */
+body.focusing { overflow: hidden; padding-bottom: 0; }
+body.focusing .topbar { display: none; }
+body.focusing main { padding: 0; }
+
+.focus {
+  position: fixed;
+  inset: 0;
+  height: var(--vvh, 100dvh);
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  z-index: 40;
+}
+
+.focushead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(var(--safe-top) + 8px) 10px 8px;
+  flex: 0 0 auto;
+}
+
+.focusexit {
+  width: var(--tap);
+  height: var(--tap);
+  flex: 0 0 var(--tap);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  font-size: 17px;
+  line-height: 1;
+}
+
+.focuswhere {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.focussection {
+  font-size: 14px;
+  font-weight: 620;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.focuscount {
+  font-size: 12px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.focusbar {
+  flex: 0 0 3px;
+  background: var(--line-soft);
+  margin: 0 10px;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.focusbar > i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s;
+}
+
+.focusbody {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 20px var(--gutter) 20px;
+  border-left: 5px solid transparent;
+}
+
+.focusbody[data-rating="1"] { border-left-color: var(--r1); }
+.focusbody[data-rating="2"] { border-left-color: var(--r2); }
+.focusbody[data-rating="3"] { border-left-color: var(--r3); }
+.focusbody[data-rating="4"] { border-left-color: var(--r4); }
+.focusbody[data-rating="5"] { border-left-color: var(--r5); }
+
+.focusq {
+  margin: 0 0 6px;
+  font-size: 27px;
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+  font-weight: 660;
+}
+
+.focushint {
+  margin: 0 0 18px;
+  color: var(--ink-faint);
+  font-size: 15px;
+}
+
+/* Bigger targets than the list view — this is the one thing on screen. */
+.focusbody .ratings { gap: 8px; margin-bottom: 14px; }
+.focusbody .rating { height: 68px; font-size: 24px; }
+.focusbody .ratingmeaning { font-size: 14.5px; margin: 0 0 16px; min-height: 3em; }
+.focusbody textarea { min-height: 96px; font-size: 17px; }
+.focusbody .field input[type="text"],
+.focusbody .field input[type="date"] { min-height: 56px; font-size: 18px; }
+.focusbody .shot, .focusbody .addshot { width: 96px; height: 96px; }
+
+.focusnav {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1.6fr;
+  gap: 10px;
+  padding: 10px var(--gutter) calc(var(--safe-bottom) + 10px);
+  border-top: 1px solid var(--line-soft);
+  background: var(--card);
+}
+
+.navbtn {
+  min-height: 56px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  font-size: 17px;
+  font-weight: 620;
+  color: var(--ink-soft);
+}
+
+.navbtn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.navbtn:disabled { opacity: 0.35; }
+
+.focusjump {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 8px var(--gutter) 24px;
+}
+
+.jumpsection {
+  margin: 18px 0 4px;
+  font-size: 12.5px;
+  font-weight: 620;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-faint);
+}
+
+.jumprow {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--tap);
+  padding: 9px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  background: none;
+  text-align: left;
+  font-size: 15.5px;
+}
+
+.jumprow[aria-current="true"] { color: var(--accent); font-weight: 620; }
+.jumpname { flex: 1; min-width: 0; }
+
 /* ------------------------------------------------------------------- toast */
 
 #toast {

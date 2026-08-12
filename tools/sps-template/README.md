@@ -39,6 +39,24 @@ SPS-KED345 Condition Assessment Report.docx
 `schema.js` is the only thing the app knows. Neither can drift from the other,
 because both come out of the same run.
 
+## On site first
+
+`SECTION_ORDER` in `build.py` puts the sections in the order the work actually
+happens and marks each one `field` or `office`. `field` is everything
+answerable standing at the station — the station number, well openings, the
+condition assessment, general improvement works and the photographs, 54
+answers — and the app opens there. Everything that needs Maximo, uMap or the
+master plan sits behind the Desk tab. Move a section between the two lists and
+the ordering, the stage tabs and the walk-through all follow.
+
+Opening a station lands on the walk-through: two stage tabs, one button that
+drops you back where you stopped, and the sections as an index. From there
+**focus mode** takes over the screen and asks one question at a time — a large
+question, the five rating targets, a comment, a camera, and Back/Next under
+the thumb. Swipe or arrow-key between questions, `☰` to jump anywhere, `✕` to
+come back out. The list view is still there behind the section chips for
+working through a table quickly or for using the thing on a laptop.
+
 ## Rebuilding after the template changes
 
 When Unitywater reissues the template, drop the new file over

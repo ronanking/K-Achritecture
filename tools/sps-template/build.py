@@ -358,15 +358,25 @@ class Builder:
             tokenise_cell(cells(row)[1], "{{f:%s}}" % fid)
             self.taken.add(fid)
 
+        # The station's own identity is the one thing needed before anything
+        # else, on site or off, so it stands apart from the paperwork.
         self.sections.append({
-            "id": "cover",
-            "title": "Cover & approvals",
-            "hint": "Fills the cover page, the site information block and the document control table.",
+            "id": "station",
+            "title": "Station",
+            "hint": "Which pump station this is. Everything else keys off it.",
             "fields": [
                 {"id": "sps_id", "label": "SPS number", "type": "text",
                  "placeholder": "SPS-KED345", "required": True,
                  "help": "Used on the cover, the running header, every caption and the file name."},
-                {"id": "report_date", "label": "Report date", "type": "date", "required": True},
+                {"id": "report_date", "label": "Date of inspection", "type": "date", "required": True},
+            ],
+        })
+
+        self.sections.append({
+            "id": "cover",
+            "title": "Document control",
+            "hint": "The approvals page and the document control table. Desk work.",
+            "fields": [
                 *[{"id": fid, "label": label, "type": kind, **({"default": default} if default else {})}
                   for fid, label, kind, default in control_map],
                 *approval_fields,
@@ -617,6 +627,24 @@ class Builder:
 
     # -- output -----------------------------------------------------------
 
+    def ordered_sections(self) -> list[dict]:
+        """Put the sections in the order the work actually happens.
+
+        The build methods run in whatever order suits the document; the app
+        wants them in the order a person fills them in, which is everything
+        answerable standing at the station first.
+        """
+        by_id = {section["id"]: section for section in self.sections}
+        missing = set(by_id) ^ {sid for sid, _ in SECTION_ORDER}
+        assert not missing, f"section not placed in SECTION_ORDER: {missing}"
+
+        ordered = []
+        for sid, stage in SECTION_ORDER:
+            section = by_id[sid]
+            section["stage"] = stage
+            ordered.append(section)
+        return ordered
+
     def write(self) -> None:
         self.parts["word/document.xml"] = self.finish_document().encode("utf-8")
         self.parts["word/header1.xml"] = self.build_header()
@@ -631,10 +659,11 @@ class Builder:
                 zout.writestr(name, self.parts[name])
 
         schema = {
-            "version": 1,
+            "version": 2,
             "template": "template.docx",
             "ratings": RATINGS,
-            "sections": self.sections,
+            "stages": STAGES,
+            "sections": self.ordered_sections(),
         }
         body = json.dumps(schema, indent=2, ensure_ascii=False)
         OUT_SCHEMA.write_text(
@@ -644,6 +673,30 @@ class Builder:
             encoding="utf-8",
         )
 
+
+# The order the work happens in, and where each part of it happens.
+#
+# `field` is everything answerable standing at the station: the three tables
+# that get filled in on site, plus the photographs and the station number. It
+# comes first, and the app offers it first. Move a section between the two
+# lists and both the ordering and the app's grouping follow.
+SECTION_ORDER = [
+    ("station", "field"),
+    ("openings", "field"),
+    ("condition", "field"),
+    ("improvements", "field"),
+    ("photos", "field"),
+    ("details", "office"),
+    ("pumps", "office"),
+    ("overview", "office"),
+    ("works", "office"),
+    ("cover", "office"),
+]
+
+STAGES = [
+    {"id": "field", "label": "On site", "hint": "Everything you can answer standing at the station."},
+    {"id": "office", "label": "Desk", "hint": "Maximo, uMap, the master plan and the approvals page."},
+]
 
 # Condition ratings, lifted from table 6 of the template so the app can show
 # the same words on site that the report prints underneath.
