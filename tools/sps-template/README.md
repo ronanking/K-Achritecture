@@ -172,6 +172,14 @@ then go offline and prove it still works. Screenshots land in `.sps-test/app/`.
   Thirty 12-megapixel HEICs would make a report nobody can email, and the
   re-encode also bakes in the EXIF rotation.
 
+## Deleting
+
+A station can be deleted from its Report tab or straight off the list. Either
+way the confirm names the station and says how many assets were rated and how
+many photographs it holds, and the toast that follows carries an **Undo** for
+eight seconds — the records are held in memory and put back unchanged. It is
+an afternoon of driving and photographs; a mis-tap should not be the end of it.
+
 ## Storage and privacy
 
 Stations and photographs live in IndexedDB on the phone and are never uploaded

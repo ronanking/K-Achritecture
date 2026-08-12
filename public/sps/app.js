@@ -620,14 +620,29 @@
 
   var toastTimer = null;
 
-  function toast(message) {
+  function toast(message, action) {
     var node = document.getElementById("toast");
-    node.textContent = message;
+    node.textContent = "";
+    node.appendChild(el("span", { text: message }));
+    if (action) {
+      node.appendChild(
+        el("button", {
+          class: "toastaction",
+          type: "button",
+          text: action.label,
+          onclick: function () {
+            node.classList.remove("show");
+            clearTimeout(toastTimer);
+            action.run();
+          },
+        })
+      );
+    }
     node.classList.add("show");
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () {
       node.classList.remove("show");
-    }, 2400);
+    }, action ? action.seconds * 1000 : 2400);
   }
 
   var saveTimer = null;
@@ -710,6 +725,52 @@
     window.scrollTo(0, y);
   }
 
+  /* Deleting a station throws away an afternoon of driving and photographs, so
+   * it is confirmed by name and then held in memory long enough to take back.
+   * Nothing is written anywhere else — undo just puts the same records back. */
+  function deleteStationWithUndo(station, done) {
+    var counts = current.counts[station.id] || {};
+    var shots = Object.keys(counts).reduce(function (total, key) {
+      return total + counts[key];
+    }, 0);
+    var rated = countAnswered(
+      station,
+      itemsInSection(station, conditionSection).filter(function (item) {
+        return item.kind === "asset";
+      }),
+      counts
+    );
+
+    var summary =
+      "Delete " + stationName(station) + "?\n\n" +
+      rated + " assets rated, " + shots + (shots === 1 ? " photo" : " photos") + ".";
+    if (!window.confirm(summary)) return Promise.resolve(false);
+
+    return store.photosFor(station.id).then(function (photos) {
+      return store.deleteStation(station.id).then(function () {
+        toast(stationName(station) + " deleted", {
+          label: "Undo",
+          seconds: 8,
+          run: function () {
+            Promise.all(
+              [store.putStation(station)].concat(
+                photos.map(function (photo) {
+                  return store.putPhoto(photo);
+                })
+              )
+            )
+              .then(loadStations)
+              .then(render)
+              .then(function () {
+                toast("Restored");
+              });
+          },
+        });
+        return done ? done() : true;
+      });
+    });
+  }
+
   // -- station list ---------------------------------------------------------
 
   function renderList() {
@@ -764,10 +825,11 @@
       var rated = countAnswered(station, conditionItems, counts);
 
       list.appendChild(
-        el("li", {}, [
+        el("li", { class: "stationcard" }, [
           el(
             "a",
             {
+              class: "stationopen",
               href: "#" + station.id,
               onclick: function (event) {
                 event.preventDefault();
@@ -788,6 +850,19 @@
               ]),
             ]
           ),
+          // Sits under the card rather than beside the name, so a thumb
+          // reaching for the station does not land on it.
+          el("button", {
+            class: "rowdelete",
+            type: "button",
+            text: "Delete",
+            "aria-label": "Delete " + stationName(station),
+            onclick: function () {
+              deleteStationWithUndo(station, function () {
+                return loadStations().then(render);
+              });
+            },
+          }),
         ])
       );
     });
@@ -1955,11 +2030,12 @@
             type: "button",
             text: "Delete station",
             onclick: function () {
-              if (!window.confirm("Delete " + stationName(station) + " and all its photos?")) return;
+              // Flush the pending autosave first, or leaving the station
+              // writes it straight back after the delete.
               clearTimeout(saveTimer);
-              current.station = null;
-              store.deleteStation(station.id).then(backToList).then(function () {
-                toast("Station deleted");
+              deleteStationWithUndo(station, function () {
+                current.station = null;
+                return backToList();
               });
             },
           }),

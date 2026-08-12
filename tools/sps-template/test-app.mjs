@@ -498,6 +498,34 @@ await step("works offline", async () => {
   await context.setOffline(false);
 });
 
+await step("a station can be deleted from the list, and put back", async () => {
+  await page.getByText("SPS-KED345").first().waitFor({ timeout: 5000 });
+  const row = page.locator(".stationcard").first();
+  const deleteButton = row.getByRole("button", { name: /^Delete SPS-KED345/ });
+  if (!(await deleteButton.count())) throw new Error("no delete on the station list");
+
+  // The confirm has to say what is about to be lost.
+  let asked = "";
+  page.once("dialog", (d) => {
+    asked = d.message();
+    d.accept();
+  });
+  await deleteButton.click();
+  await page.getByText("Nothing captured yet").waitFor({ timeout: 5000 });
+  if (!/SPS-KED345/.test(asked) || !/photo/.test(asked)) {
+    throw new Error(`the confirm did not say what is lost: ${asked}`);
+  }
+
+  // Undo brings the station and its photographs back.
+  await page.getByRole("button", { name: "Undo" }).click();
+  await page.getByText("SPS-KED345").first().waitFor({ timeout: 5000 });
+  const meta = await page.locator(".stationlist .meta").first().innerText();
+  if (!/3 photos/.test(meta)) throw new Error(`undo lost the photos: ${meta}`);
+  await page.reload({ waitUntil: "networkidle" });
+  await page.getByText("SPS-KED345").first().waitFor({ timeout: 5000 });
+  await shot("11-list-delete");
+});
+
 await step("a deleted station stays deleted", async () => {
   await page.getByText("SPS-KED345").first().click();
   await page.getByRole("button", { name: "Report", exact: true }).first().click();
