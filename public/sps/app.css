@@ -333,6 +333,29 @@ h2.section {
 
 .ratingmeaning b { color: var(--ink); font-weight: 620; }
 
+/* Off the 1-5 scale on purpose, so it does not look like a sixth grade. */
+.nabtn {
+  width: 100%;
+  min-height: 44px;
+  margin-bottom: 10px;
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink-faint);
+  font-size: 14.5px;
+  font-weight: 560;
+}
+
+.nabtn[aria-pressed="true"] {
+  background: var(--line-soft);
+  border-color: color-mix(in srgb, var(--ink) 40%, transparent);
+  color: var(--ink);
+}
+
+.assetcard[data-rating="N/A"] { border-left-color: var(--line); }
+.focusbody[data-rating="N/A"] { border-left-color: var(--line); }
+.focusbody .nabtn { min-height: 52px; font-size: 15.5px; }
+
 /* ------------------------------------------------------------------ photos */
 
 .shots { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }

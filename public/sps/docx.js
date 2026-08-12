@@ -465,11 +465,14 @@
       if (!photosByGroup[group.id]) rows.push({ label: group.label, condition: "—" });
     });
 
+    var na = (index.notApplicable && index.notApplicable.value) || "N/A";
     index.conditionAssets.forEach(function (asset) {
       var list = (instances && instances[asset.id]) || [{ key: asset.id, label: "" }];
       list.forEach(function (instance) {
         if (photosByGroup[instance.key]) return;
         var rating = values[instance.key + "_rating"];
+        // Something that is not at this station is not a missing photograph.
+        if (rating === na) return;
         rows.push({
           label: asset.label + (instance.label ? " (" + instance.label + ")" : ""),
           condition: rating ? rating : "Not rated",
@@ -495,7 +498,12 @@
         extraPhotos = section.extraPhotos || [];
       }
     });
-    return { byId: byId, conditionAssets: conditionAssets, extraPhotos: extraPhotos };
+    return {
+      byId: byId,
+      conditionAssets: conditionAssets,
+      extraPhotos: extraPhotos,
+      notApplicable: schema.notApplicable,
+    };
   }
 
   /* Which groups appear in Appendix 1 and in what order: the template's own
@@ -522,7 +530,10 @@
   }
 
   function ratingFill(schema, value) {
-    var match = (schema.ratings || []).filter(function (r) {
+    var choices = (schema.ratings || []).concat(
+      schema.notApplicable ? [schema.notApplicable] : []
+    );
+    var match = choices.filter(function (r) {
       return r.value === String(value);
     })[0];
     return match ? match.fill : "auto";

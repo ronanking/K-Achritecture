@@ -318,28 +318,70 @@ await step("the site-only shots live with the condition rows", async () => {
   await shot("07-sitephotos");
 });
 
-await step("a row can hold a second of something", async () => {
+await step("a second well takes a whole set of measurements", async () => {
   await page.getByRole("button", { name: /^Well openings/ }).click();
   const values = page.locator("main .field input:not(.instlabel)");
   const before = await values.count();
-  await page.getByRole("button", { name: /Another l1/i }).click();
-  await page.waitForTimeout(500);
-  if ((await values.count()) !== before + 1) {
-    throw new Error(`adding a second L1 gave ${before} -> ${await values.count()} value inputs`);
+  if (before !== 3) throw new Error(`expected 3 measurements, saw ${before}`);
+  if ((await page.locator("main .card").count()) !== 1) {
+    throw new Error("the first well should be one block");
   }
+
+  // A second well is a second of every measurement, not a second L1.
+  await page.getByRole("button", { name: "+ Another well" }).click();
+  await page.waitForTimeout(600);
+  if ((await values.count()) !== 6) {
+    throw new Error(`a second well should add 3 measurements, saw ${await values.count()}`);
+  }
+  if ((await page.locator("main .card").count()) !== 2) {
+    throw new Error("the second well should be its own block");
+  }
+  // Named once for the block, not once per row.
   if ((await page.locator(".instlabel").count()) !== 1) {
-    throw new Error("the copy has no name field");
+    throw new Error("expected one name field for the whole set");
   }
 
-  await page.locator(".instlabel").first().fill("Well 2");
-  await values.nth(1).fill("980");
+  await page.locator(".instlabel").fill("Well 2");
+  await page.waitForTimeout(300);
+  const headings = await page.locator("main .card > h3").allInnerTexts();
+  if (headings.join("|") !== "First well|well Well 2") {
+    throw new Error(`well blocks are mislabelled: ${headings.join(" / ")}`);
+  }
+
+  await values.nth(0).fill("1200");
+  await values.nth(3).fill("980");
   await page.waitForTimeout(500);
-
-  const labels = await page.locator("main .field > label").allInnerTexts();
-  if (!labels.some((l) => l.includes("L1 (mm) (Well 2)"))) {
-    throw new Error(`the copy is not named: ${labels.join(" / ")}`);
-  }
   await shot("08-repeat");
+});
+
+await step("N/A is an answer, not a blank", async () => {
+  await page.getByRole("button", { name: /^Condition assessment/ }).click();
+  const rpz = page.locator(".assetcard", { hasText: "RPZ" }).first();
+  await rpz.scrollIntoViewIfNeeded();
+  const naButton = rpz.locator(".nabtn");
+  if (!(await naButton.count())) throw new Error("no N/A option on a condition row");
+  await naButton.click();
+  await page.waitForTimeout(400);
+  if ((await naButton.getAttribute("aria-pressed")) !== "true") {
+    throw new Error("N/A did not take");
+  }
+  if ((await rpz.getAttribute("data-rating")) !== "N/A") {
+    throw new Error("N/A was not stored as the rating");
+  }
+  const meaning = await rpz.locator(".ratingmeaning").innerText();
+  if (!meaning.includes("Not present")) throw new Error(`N/A has no explanation: ${meaning}`);
+  // It counts as answered, so the tally moves.
+  const tally = await page.locator('.chip[aria-current="true"] .tally').innerText();
+  if (tally !== "6/31") throw new Error(`N/A did not count as answered: ${tally}`);
+
+  // And picking a number afterwards clears it.
+  await rpz.locator('.rating[data-value="3"]').click();
+  await page.waitForTimeout(300);
+  if ((await naButton.getAttribute("aria-pressed")) !== "false") {
+    throw new Error("N/A stayed selected after a number was chosen");
+  }
+  await naButton.click();
+  await page.waitForTimeout(300);
 });
 
 await step("a second sluice valve gets its own rating", async () => {
@@ -431,7 +473,7 @@ await step("data survives a reload", async () => {
   await page.reload({ waitUntil: "networkidle" });
   await page.getByText("SPS-KED345").first().waitFor({ timeout: 5000 });
   const meta = await page.locator(".stationlist .meta").first().innerText();
-  if (!/5 of 30 assets rated/.test(meta)) throw new Error(`list meta wrong: ${meta}`);
+  if (!/6 of 30 assets rated/.test(meta)) throw new Error(`list meta wrong: ${meta}`);
   if (!/3 photos/.test(meta)) throw new Error(`photo count wrong: ${meta}`);
   await shot("10-list");
 });

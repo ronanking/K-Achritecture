@@ -526,8 +526,10 @@ class Builder:
             f["inputMode"] = "decimal"
         self.sections.append({
             "id": "openings", "title": "Well openings",
-            "hint": "Table 3. Clear opening measurements in millimetres. "
-                    "More than one well? Add another set to any row.",
+            "hint": "Table 3. Clear opening measurements in millimetres.",
+            # Two wells means two of every measurement, not two L1s, so this
+            # table repeats as a block rather than a row at a time.
+            "repeatSet": {"noun": "well"},
             "fields": fields,
         })
 
@@ -717,6 +719,7 @@ class Builder:
             "version": 2,
             "template": "template.docx",
             "ratings": RATINGS,
+            "notApplicable": NOT_APPLICABLE,
             "stages": STAGES,
             "sections": self.ordered_sections(),
         }
@@ -763,6 +766,17 @@ PHOTO_GROUP_MERGES = {
     "Wet Well": "Wet Well Wall",
     "Vent Pole": "Vent Pole / Base",
     "Zero MH": "Zero Maintenance Hole",
+}
+
+# Not everything on the list is at every station: no davit, no RPZ, no bypass.
+# "Not rated" and "not there" are different answers and the report should be
+# able to say which. Grey rather than a scale colour, because it is not on the
+# scale.
+NOT_APPLICABLE = {
+    "value": "N/A",
+    "label": "Not applicable",
+    "fill": "EDEDED",
+    "help": "Not present at this station.",
 }
 
 STAGES = [

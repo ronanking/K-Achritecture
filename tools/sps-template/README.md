@@ -62,6 +62,20 @@ Instance one keeps the original field ids, so nothing already captured moves,
 and keys are never reused — deleting the middle of three cannot make a later
 copy inherit the deleted one's answers.
 
+Well openings repeat as a **set** rather than a row at a time: a second well
+means a second of every measurement, so `repeatSet` on the section gives it one
+**+ Another well** button, one name for the block, and one Remove. Tables 1, 4
+and 5 stay row-by-row, where a second sluice valve has nothing to do with the
+row above it.
+
+### N/A
+
+Not everything on the list is at every station — no davit, no RPZ, no bypass —
+and *not rated* and *not there* are different answers. Every condition row has
+an N/A alongside the 1–5 scale. It counts as answered, prints `N/A` in table 5
+shaded grey rather than a scale colour, and is left out of the not-photographed
+register: something that is not there is not a missing photograph.
+
 ### Photographs live on the thing they are of
 
 The template's nine standing Appendix 1 shots are mostly of something that

@@ -45,6 +45,12 @@ window.SPS_SCHEMA = {
       "other": "Structural condition is affecting operation of the asset"
     }
   ],
+  "notApplicable": {
+    "value": "N/A",
+    "label": "Not applicable",
+    "fill": "EDEDED",
+    "help": "Not present at this station."
+  },
   "stages": [
     {
       "id": "field",
@@ -83,7 +89,10 @@ window.SPS_SCHEMA = {
     {
       "id": "openings",
       "title": "Well openings",
-      "hint": "Table 3. Clear opening measurements in millimetres. More than one well? Add another set to any row.",
+      "hint": "Table 3. Clear opening measurements in millimetres.",
+      "repeatSet": {
+        "noun": "well"
+      },
       "fields": [
         {
           "id": "open_l1",

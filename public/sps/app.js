@@ -241,6 +241,7 @@
   // ----------------------------------------------------------- the walk-through --
 
   var stages = schema.stages || [{ id: "field", label: "On site" }];
+  var notApplicable = schema.notApplicable;
 
   function sectionsInStage(stageId) {
     return schema.sections.filter(function (section) {
@@ -298,6 +299,48 @@
     )
       .then(saveNow)
       .then(refreshPhotos);
+  }
+
+  /* Some tables repeat as a block rather than a row at a time: a second well
+   * means a second of every measurement, not a second L1. The set's fields all
+   * carry the same ordinal and the same name, added and removed together. */
+  function isRepeatSet(section) {
+    return !!(section.repeatSet && (section.fields || []).length);
+  }
+
+  function setsIn(station, section) {
+    return instancesOf(station, section.fields[0].id);
+  }
+
+  function addInstanceSet(section) {
+    var created = null;
+    section.fields.forEach(function (field) {
+      var one = addInstance(field.id);
+      if (!created) created = one;
+      one.label = created.label;
+    });
+    renameSet(section, created.ordinal, created.label);
+    return created;
+  }
+
+  function renameSet(section, ordinal, label) {
+    var all = current.station.instances || {};
+    section.fields.forEach(function (field) {
+      (all[field.id] || []).forEach(function (instance, i) {
+        if (i + 2 === ordinal) instance.label = label;
+      });
+    });
+    scheduleSave();
+  }
+
+  function removeInstanceSet(section, ordinal) {
+    var all = current.station.instances || {};
+    return Promise.all(
+      section.fields.map(function (field) {
+        var doomed = (all[field.id] || [])[ordinal - 2];
+        return doomed ? removeInstance(field.id, doomed.key) : Promise.resolve();
+      })
+    );
   }
 
   function labelWith(label, instance) {
@@ -1115,19 +1158,43 @@
     }
 
     // A second of this thing, added right here and stepped straight into.
-    var repeatable = item.kind === "asset" ? item.asset : item.kind === "field" ? item.field : null;
-    if (repeatable && repeatable.repeatable) {
+    function stepToNewInstance(baseIds) {
+      var grown = itemsInStage(current.station, current.stage);
+      var landing = grown.findIndex(function (each) {
+        return baseIds.indexOf(each.base) >= 0 && each.instance && each.instance.ordinal > 1 &&
+          !itemAnswered(current.station, each, photoCounts());
+      });
+      current.focus.index = landing < 0 ? index + 1 : landing;
+      render();
+    }
+
+    if (isRepeatSet(item.section) && item.kind === "field") {
+      var noun = item.section.repeatSet.noun;
       body.appendChild(
-        addAnotherButton(repeatable, repeatable.label, function () {
-          var grown = itemsInStage(current.station, current.stage);
-          var landing = grown.findIndex(function (each) {
-            return each.base === repeatable.id && each.instance && each.instance.ordinal > 1 &&
-              !itemAnswered(current.station, each, photoCounts());
-          });
-          current.focus.index = landing < 0 ? index + 1 : landing;
-          render();
+        el("button", {
+          class: "addanother",
+          type: "button",
+          text: "+ Another " + noun,
+          onclick: function () {
+            var created = addInstanceSet(item.section);
+            toast("Added " + noun + " " + created.label);
+            stepToNewInstance(
+              item.section.fields.map(function (field) {
+                return field.id;
+              })
+            );
+          },
         })
       );
+    } else {
+      var repeatable = item.kind === "asset" ? item.asset : item.kind === "field" ? item.field : null;
+      if (repeatable && repeatable.repeatable) {
+        body.appendChild(
+          addAnotherButton(repeatable, repeatable.label, function () {
+            stepToNewInstance([repeatable.id]);
+          })
+        );
+      }
     }
 
     screen.appendChild(body);
@@ -1332,6 +1399,7 @@
   // -- plain field sections -------------------------------------------------
 
   function renderFields(section) {
+    if (isRepeatSet(section)) return renderRepeatSets(section);
     var container = el("div", { class: section.columns ? "card grid2" : "card" });
     section.fields.forEach(function (field) {
       instancesForEntry(current.station, field).forEach(function (instance) {
@@ -1342,16 +1410,82 @@
     app.appendChild(container);
   }
 
-  function renderField(field, instance) {
+  /* One card per well: every measurement for that well together, named as a
+   * block, added and removed as a block. */
+  function renderRepeatSets(section) {
+    var noun = section.repeatSet.noun;
+
+    setsIn(current.station, section).forEach(function (set) {
+      var card = el("div", { class: "card" });
+      var heading = el("h3", {
+        text: set.ordinal === 1 ? "First " + noun : noun + " " + set.label,
+      });
+      card.appendChild(heading);
+
+      if (set.ordinal > 1) {
+        var name = el("input", {
+          class: "instlabel",
+          type: "text",
+          value: set.label,
+          placeholder: String(set.ordinal),
+          "aria-label": "Name for this " + noun,
+        });
+        name.addEventListener("input", function () {
+          renameSet(section, set.ordinal, name.value);
+          heading.textContent = noun + " " + (name.value || String(set.ordinal));
+        });
+        card.appendChild(
+          el("div", { class: "instrow" }, [
+            name,
+            el("button", {
+              class: "textbtn danger",
+              type: "button",
+              text: "Remove this " + noun,
+              onclick: function () {
+                if (!window.confirm("Remove this " + noun + " and its measurements?")) return;
+                removeInstanceSet(section, set.ordinal).then(function () {
+                  renderKeepingScroll();
+                  toast("Removed");
+                });
+              },
+            }),
+          ])
+        );
+      }
+
+      section.fields.forEach(function (field) {
+        var instance = instancesOf(current.station, field.id).filter(function (each) {
+          return each.ordinal === set.ordinal;
+        })[0];
+        if (instance) card.appendChild(renderField(field, instance, true));
+      });
+      app.appendChild(card);
+    });
+
+    app.appendChild(
+      el("button", {
+        class: "addanother",
+        type: "button",
+        text: "+ Another " + noun,
+        onclick: function () {
+          var created = addInstanceSet(section);
+          renderKeepingScroll();
+          toast("Added " + noun + " " + created.label);
+        },
+      })
+    );
+  }
+
+  function renderField(field, instance, insideSet) {
     var valueId = (instance && instance.key) || field.id;
     var value = current.station.values[valueId] || "";
     var wrap = el("div", { class: "field" + (isFilled(value) ? " filled" : "") });
     var label = el("label", { for: "f_" + valueId });
     var text = field.column ? field.label + " — " + field.column : field.label;
-    label.appendChild(document.createTextNode(labelWith(text, instance)));
+    label.appendChild(document.createTextNode(insideSet ? text : labelWith(text, instance)));
     if (field.help) label.appendChild(el("span", { class: "help", text: field.help }));
     wrap.appendChild(label);
-    if (instance && instance.ordinal > 1) {
+    if (!insideSet && instance && instance.ordinal > 1) {
       wrap.appendChild(
         instanceControls(field.id, instance, function (named) {
           label.firstChild.nodeValue = text + " (" + named + ")";
@@ -1544,6 +1678,11 @@
     var meaning = el("p", { class: "ratingmeaning" });
     function describe(value) {
       meaning.textContent = "";
+      if (value === notApplicable.value) {
+        meaning.appendChild(el("b", { text: notApplicable.value + ". " }));
+        meaning.appendChild(document.createTextNode(notApplicable.help));
+        return;
+      }
       var rating = schema.ratings.filter(function (r) {
         return r.value === value;
       })[0];
@@ -1556,6 +1695,19 @@
     }
 
     var ratings = el("div", { class: "ratings" });
+    var naButton = null;
+
+    function choose(value) {
+      var next = values[ratingId] === value ? "" : value;
+      setValue(ratingId, next);
+      host.setAttribute("data-rating", next);
+      ratings.querySelectorAll(".rating").forEach(function (button) {
+        button.setAttribute("aria-pressed", String(button.getAttribute("data-value") === next));
+      });
+      if (naButton) naButton.setAttribute("aria-pressed", String(next === notApplicable.value));
+      describe(next);
+    }
+
     schema.ratings.forEach(function (rating) {
       ratings.appendChild(
         el("button", {
@@ -1566,20 +1718,23 @@
           "aria-label": rating.value + " — " + rating.label,
           text: rating.value,
           onclick: function () {
-            var next = values[ratingId] === rating.value ? "" : rating.value;
-            setValue(ratingId, next);
-            host.setAttribute("data-rating", next);
-            ratings.querySelectorAll(".rating").forEach(function (button) {
-              button.setAttribute(
-                "aria-pressed",
-                String(button.getAttribute("data-value") === next)
-              );
-            });
-            describe(next);
+            choose(rating.value);
           },
         })
       );
     });
+
+    // Off the scale on purpose: no davit, no RPZ, no bypass at this station.
+    naButton = el("button", {
+      class: "nabtn",
+      type: "button",
+      "aria-pressed": String(values[ratingId] === notApplicable.value),
+      text: notApplicable.value + " — " + notApplicable.help.replace(/\.$/, ""),
+      onclick: function () {
+        choose(notApplicable.value);
+      },
+    });
+
     describe(values[ratingId] || "");
 
     var comment = el("textarea", {
@@ -1598,6 +1753,7 @@
 
     return [
       ratings,
+      naButton,
       meaning,
       el("div", { class: "field" }, [comment]),
       renderShots(instance.key, labelWith(asset.label, instance)),

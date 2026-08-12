@@ -73,6 +73,11 @@ const instances = {
     { key: `${repeatField.id}__2`, label: "Well 2" },
   ],
 };
+// One asset is not at this station at all.
+const naAsset = conditionSection.assets.find((a) => a.label === "RPZ");
+values[`${naAsset.id}_rating`] = schema.notApplicable.value;
+values[`${naAsset.id}_comment`] = "No RPZ at this station.";
+
 values[`${repeatAsset.id}__2_rating`] = "5";
 values[`${repeatAsset.id}__2_comment`] = "Seized, spindle sheared.";
 values[`${repeatField.id}__2`] = "980";
@@ -228,10 +233,18 @@ const photographed = new Set(photoGroups);
 const unshot = conditionSection.assets.filter((a) => !photographed.has(a.id));
 check(unshot.length > 20, "expected most assets to be unphotographed in this fixture");
 // header + every unphotographed asset instance + the unphotographed site shot
+// Not-applicable assets are not missing photographs, so they are left out.
 const registerRows =
-  1 + unshot.length + 1 /* the second gate valve */ + extraPhotos.filter(
+  1 + (unshot.length - 1) + 1 /* the second gate valve */ + extraPhotos.filter(
     (g) => !photographed.has(g.id)
   ).length;
+const registerXml = documentXml.slice(
+  documentXml.indexOf("Table 8: Assets inspected but not photographed")
+);
+check(
+  !registerXml.includes(naAsset.label),
+  "a not-applicable asset should not be listed as un-photographed"
+);
 check(
   documentXml.includes(`${repeatAsset.label} (east)`),
   "a repeated instance should appear in the register too"
@@ -250,6 +263,16 @@ for (const rating of schema.ratings) {
   );
 }
 check(!/w:fill="\{\{/.test(documentXml), "a shading token survived");
+
+// --- N/A ---------------------------------------------------------------------
+check(
+  documentXml.includes(`<w:t xml:space="preserve">${schema.notApplicable.value}</w:t>`),
+  "N/A did not reach the rating cell"
+);
+check(
+  documentXml.includes(`w:fill="${schema.notApplicable.fill}"`),
+  "the N/A cell is not shaded off the scale"
+);
 
 // The bulleted works list, and paragraphs from the overview prompts.
 check(
