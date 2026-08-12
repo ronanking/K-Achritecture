@@ -262,6 +262,62 @@
     return xml;
   }
 
+  // --------------------------------------------------- repeated table rows ----
+
+  /* Find the w:tr a token sits in. Table rows do not nest in this document,
+   * so the nearest preceding row start owns the token. */
+  function enclosingRow(xml, token) {
+    var at = xml.indexOf(token);
+    if (at < 0) return null;
+    var start = Math.max(xml.lastIndexOf("<w:tr ", at), xml.lastIndexOf("<w:tr>", at));
+    var end = xml.indexOf("</w:tr>", at);
+    if (start < 0 || end < 0) return null;
+    return { start: start, end: end + "</w:tr>".length };
+  }
+
+  /* Duplicate a row once per extra instance.
+   *
+   * A station can have two sluice valves, or three wells worth of opening
+   * measurements, against one row in the template. Each extra instance gets a
+   * copy of the row directly beneath the original, with its tokens re-pointed
+   * at that instance's values and its label suffixed — `Pumps (2)`.
+   *
+   * Runs before any substitution, so the clones are still full of tokens and
+   * the ordinary passes fill them in.
+   */
+  function expandRepeats(xml, instances) {
+    Object.keys(instances || {}).forEach(function (base) {
+      var list = instances[base] || [];
+      if (list.length < 2) return;
+
+      var marker = "{{n:" + base + "}}";
+      var row = enclosingRow(xml, marker);
+      if (!row) return;
+      var original = xml.slice(row.start, row.end);
+
+      var clones = list
+        .slice(1)
+        .map(function (instance) {
+          return original
+            .replace(/\{\{(f|shd):([a-z0-9_]+)\}\}/g, function (whole, kind, id) {
+              // `cond_pumps_rating` under instance `cond_pumps__2` becomes
+              // `cond_pumps__2_rating`; anything else in the row is left be.
+              return id.indexOf(base) === 0
+                ? "{{" + kind + ":" + instance.key + id.slice(base.length) + "}}"
+                : whole;
+            })
+            .split(marker)
+            .join(" (" + esc(instance.label || "") + ")");
+        })
+        .join("");
+
+      xml = xml.slice(0, row.end) + clones + xml.slice(row.end);
+    });
+
+    // The original row of every group — repeated or not — keeps its own label.
+    return xml.replace(/\{\{n:[a-z0-9_]+\}\}/g, "");
+  }
+
   // ------------------------------------------------------------- images ----
 
   function fit(photo, maxWidth, maxHeight) {
@@ -355,36 +411,111 @@
     );
   }
 
+  /* The register of everything Appendix 1 does not show.
+   *
+   * Only what was photographed gets a plate, so this is the other half of the
+   * record: what was inspected but not photographed, and how it rated. A gap
+   * in the evidence is worth stating rather than leaving to be noticed. */
+  function missingTable(rows) {
+    if (!rows.length) return "";
+
+    var body = rows
+      .map(function (row) {
+        return (
+          "<w:tr>" +
+          '<w:tc><w:tcPr><w:tcW w:w="6795" w:type="dxa"/></w:tcPr>' +
+          textParagraph("ParaNormal", row.label) +
+          "</w:tc>" +
+          '<w:tc><w:tcPr><w:tcW w:w="3399" w:type="dxa"/></w:tcPr>' +
+          textParagraph("ParaNormal", row.condition) +
+          "</w:tc></w:tr>"
+        );
+      })
+      .join("");
+
+    return (
+      textParagraph("Caption", "Table 8: Assets inspected but not photographed") +
+      "<w:tbl><w:tblPr>" +
+      '<w:tblStyle w:val="UnitywaterTable2"/><w:tblW w:w="0" w:type="auto"/>' +
+      '<w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1"' +
+      ' w:lastColumn="0" w:noHBand="0" w:noVBand="1"/>' +
+      "</w:tblPr>" +
+      '<w:tblGrid><w:gridCol w:w="6795"/><w:gridCol w:w="3399"/></w:tblGrid>' +
+      '<w:tr><w:trPr><w:cnfStyle w:val="100000000000" w:firstRow="1" w:lastRow="0"' +
+      ' w:firstColumn="0" w:lastColumn="0" w:oddVBand="0" w:evenVBand="0" w:oddHBand="0"' +
+      ' w:evenHBand="0" w:firstRowFirstColumn="0" w:firstRowLastColumn="0"' +
+      ' w:lastRowFirstColumn="0" w:lastRowLastColumn="0"/></w:trPr>' +
+      '<w:tc><w:tcPr><w:tcW w:w="6795" w:type="dxa"/></w:tcPr>' +
+      textParagraph("ParaNormal", "Asset") +
+      "</w:tc>" +
+      '<w:tc><w:tcPr><w:tcW w:w="3399" w:type="dxa"/></w:tcPr>' +
+      textParagraph("ParaNormal", "Condition") +
+      "</w:tc></w:tr>" +
+      body +
+      "</w:tbl>" +
+      paragraph("ParaNormal", "")
+    );
+  }
+
+  /* Everything that could have carried a photograph and did not. */
+  function unphotographed(index, values, photosByGroup, instances) {
+    var rows = [];
+
+    (index.extraPhotos || []).forEach(function (group) {
+      if (!photosByGroup[group.id]) rows.push({ label: group.label, condition: "—" });
+    });
+
+    index.conditionAssets.forEach(function (asset) {
+      var list = (instances && instances[asset.id]) || [{ key: asset.id, label: "" }];
+      list.forEach(function (instance) {
+        if (photosByGroup[instance.key]) return;
+        var rating = values[instance.key + "_rating"];
+        rows.push({
+          label: asset.label + (instance.label ? " (" + instance.label + ")" : ""),
+          condition: rating ? rating : "Not rated",
+        });
+      });
+    });
+
+    return rows;
+  }
+
   // ------------------------------------------------------------ the fill ----
 
   function schemaIndex(schema) {
     var byId = Object.create(null);
     var conditionAssets = [];
-    var siteGroups = [];
+    var extraPhotos = [];
     schema.sections.forEach(function (section) {
       (section.fields || []).forEach(function (field) {
         byId[field.id] = field;
       });
-      if (section.kind === "condition") conditionAssets = section.assets || [];
-      if (section.kind === "photos") siteGroups = section.groups || [];
+      if (section.kind === "condition") {
+        conditionAssets = section.assets || [];
+        extraPhotos = section.extraPhotos || [];
+      }
     });
-    return { byId: byId, conditionAssets: conditionAssets, siteGroups: siteGroups };
+    return { byId: byId, conditionAssets: conditionAssets, extraPhotos: extraPhotos };
   }
 
   /* Which groups appear in Appendix 1 and in what order: the template's own
    * standing shots first, then every rated asset that was photographed. */
-  function appendixGroups(index, values, photosByGroup) {
+  function appendixGroups(index, values, photosByGroup, instances) {
     var groups = [];
-    index.siteGroups.forEach(function (group) {
+    index.extraPhotos.forEach(function (group) {
       if (photosByGroup[group.id]) groups.push({ heading: group.label, photos: photosByGroup[group.id] });
     });
     index.conditionAssets.forEach(function (asset) {
-      var photos = photosByGroup[asset.id];
-      if (!photos) return;
-      var rating = values[asset.id + "_rating"];
-      groups.push({
-        heading: rating ? asset.label + " — condition " + rating : asset.label,
-        photos: photos,
+      var list = (instances && instances[asset.id]) || [{ key: asset.id, label: "" }];
+      list.forEach(function (instance) {
+        var photos = photosByGroup[instance.key];
+        if (!photos) return;
+        var label = asset.label + (instance.label ? " (" + instance.label + ")" : "");
+        var rating = values[instance.key + "_rating"];
+        groups.push({
+          heading: rating ? label + " — condition " + rating : label,
+          photos: photos,
+        });
       });
     });
     return groups;
@@ -472,8 +603,11 @@
       (photosByGroup[photo.group] = photosByGroup[photo.group] || []).push(photo);
     });
 
+    // --- repeated rows, before anything is substituted into them -----------
+    documentXml = expandRepeats(documentXml, options.instances);
+
     // --- block tokens ------------------------------------------------------
-    var groups = appendixGroups(index, values, photosByGroup);
+    var groups = appendixGroups(index, values, photosByGroup, options.instances);
     var docPrCounter = 0;
     var appendix = groups
       .map(function (group) {
@@ -482,10 +616,13 @@
         return table;
       })
       .join("");
+    var register = missingTable(
+      unphotographed(index, values, photosByGroup, options.instances)
+    );
     documentXml = replaceParagraphAt(
       documentXml,
       "{{photos}}",
-      appendix || textParagraph("ParaNormal", "No site photographs were captured.")
+      (appendix || textParagraph("ParaNormal", "No site photographs were captured.")) + register
     );
 
     Object.keys(index.byId).forEach(function (id) {

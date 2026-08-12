@@ -83,24 +83,27 @@ window.SPS_SCHEMA = {
     {
       "id": "openings",
       "title": "Well openings",
-      "hint": "Table 3. Clear opening measurements in millimetres.",
+      "hint": "Table 3. Clear opening measurements in millimetres. More than one well? Add another set to any row.",
       "fields": [
         {
           "id": "open_l1",
           "label": "L1 (mm)",
           "type": "text",
+          "repeatable": true,
           "inputMode": "decimal"
         },
         {
           "id": "open_l2",
           "label": "L2 (mm)",
           "type": "text",
+          "repeatable": true,
           "inputMode": "decimal"
         },
         {
           "id": "open_useable_width_guide_rail_centre_to",
           "label": "Useable Width (U) – Guide Rail Centre to Inner Edge (mm)",
           "type": "text",
+          "repeatable": true,
           "inputMode": "decimal"
         }
       ],
@@ -110,123 +113,183 @@ window.SPS_SCHEMA = {
       "id": "condition",
       "title": "Condition assessment",
       "kind": "condition",
-      "hint": "Table 5. Rate it, say why, photograph it. Photos land in Appendix 1 under the asset name.",
+      "hint": "Table 5. Rate it, say why, photograph it. Two of something — a second sluice valve, a second pump — add another and it gets its own row.",
       "assets": [
         {
           "id": "cond_signage",
-          "label": "Signage"
+          "label": "Signage",
+          "repeatable": true
         },
         {
           "id": "cond_access_and_driveway",
-          "label": "Access and Driveway"
+          "label": "Access and Driveway",
+          "repeatable": true
         },
         {
           "id": "cond_switchboard",
-          "label": "Switchboard"
+          "label": "Switchboard",
+          "repeatable": true,
+          "alsoKnownAs": [
+            "Switchboard"
+          ]
         },
         {
           "id": "cond_property_pole",
-          "label": "Property Pole"
+          "label": "Property Pole",
+          "repeatable": true,
+          "alsoKnownAs": [
+            "Property Pole"
+          ]
         },
         {
           "id": "cond_telemetry",
-          "label": "Telemetry"
+          "label": "Telemetry",
+          "repeatable": true
         },
         {
           "id": "cond_rpz",
-          "label": "RPZ"
+          "label": "RPZ",
+          "repeatable": true
         },
         {
           "id": "cond_vent_pole_base",
-          "label": "Vent Pole / Base"
+          "label": "Vent Pole / Base",
+          "repeatable": true,
+          "alsoKnownAs": [
+            "Vent Pole"
+          ]
         },
         {
           "id": "cond_access_lid",
-          "label": "Access Lid"
+          "label": "Access Lid",
+          "repeatable": true
         },
         {
           "id": "cond_odour_seals",
-          "label": "Odour Seals"
+          "label": "Odour Seals",
+          "repeatable": true
         },
         {
           "id": "cond_fall_protection",
-          "label": "Fall Protection"
+          "label": "Fall Protection",
+          "repeatable": true
         },
         {
           "id": "cond_wet_well_wall",
-          "label": "Wet Well Wall"
+          "label": "Wet Well Wall",
+          "repeatable": true,
+          "alsoKnownAs": [
+            "Wet Well"
+          ]
         },
         {
           "id": "cond_ladder",
-          "label": "Ladder"
+          "label": "Ladder",
+          "repeatable": true
         },
         {
           "id": "cond_hand_railing",
-          "label": "Hand-railing"
+          "label": "Hand-railing",
+          "repeatable": true
         },
         {
           "id": "cond_inlet_penetration",
-          "label": "Inlet Penetration"
+          "label": "Inlet Penetration",
+          "repeatable": true
         },
         {
           "id": "cond_inlet_valve_spindle",
-          "label": "Inlet Valve / Spindle"
+          "label": "Inlet Valve / Spindle",
+          "repeatable": true
         },
         {
           "id": "cond_dropper_pipe_baffle",
-          "label": "Dropper Pipe / Baffle"
+          "label": "Dropper Pipe / Baffle",
+          "repeatable": true
         },
         {
           "id": "cond_benching",
-          "label": "Benching"
+          "label": "Benching",
+          "repeatable": true
         },
         {
           "id": "cond_pedestals",
-          "label": "Pedestals"
+          "label": "Pedestals",
+          "repeatable": true
         },
         {
           "id": "cond_pumps",
-          "label": "Pumps"
+          "label": "Pumps",
+          "repeatable": true
         },
         {
           "id": "cond_chains",
-          "label": "Chains"
+          "label": "Chains",
+          "repeatable": true
         },
         {
           "id": "cond_guide_rails",
-          "label": "Guide Rails"
+          "label": "Guide Rails",
+          "repeatable": true
         },
         {
           "id": "cond_guide_rail_brackets",
-          "label": "Guide Rail Brackets"
+          "label": "Guide Rail Brackets",
+          "repeatable": true
         },
         {
           "id": "cond_riser_pipework_bends",
-          "label": "Riser Pipework / Bends"
+          "label": "Riser Pipework / Bends",
+          "repeatable": true
         },
         {
           "id": "cond_reflux_valves",
-          "label": "Reflux Valves"
+          "label": "Reflux Valves",
+          "repeatable": true
         },
         {
           "id": "cond_gate_valves_spindles",
-          "label": "Gate Valves / Spindles"
+          "label": "Gate Valves / Spindles",
+          "repeatable": true
         },
         {
           "id": "cond_discharge_penetrations",
-          "label": "Discharge Penetrations"
+          "label": "Discharge Penetrations",
+          "repeatable": true
         },
         {
           "id": "cond_davit_base",
-          "label": "Davit Base"
+          "label": "Davit Base",
+          "repeatable": true,
+          "alsoKnownAs": [
+            "Davit Base"
+          ]
         },
         {
           "id": "cond_bypass",
-          "label": "Bypass"
+          "label": "Bypass",
+          "repeatable": true,
+          "alsoKnownAs": [
+            "Bypass point"
+          ]
         },
         {
           "id": "cond_zero_maintenance_hole",
-          "label": "Zero Maintenance Hole"
+          "label": "Zero Maintenance Hole",
+          "repeatable": true,
+          "alsoKnownAs": [
+            "Zero MH"
+          ]
+        }
+      ],
+      "extraPhotos": [
+        {
+          "id": "site_site_layout",
+          "label": "Site Layout"
+        },
+        {
+          "id": "site_top_slab",
+          "label": "Top Slab"
         }
       ],
       "stage": "field"
@@ -239,102 +302,68 @@ window.SPS_SCHEMA = {
         {
           "id": "imp_site_conditions_pavements_sinkage_trip_hazards",
           "label": "Site Conditions – pavements, sinkage, trip hazards",
-          "type": "textarea"
+          "type": "textarea",
+          "repeatable": true
         },
         {
           "id": "imp_noise",
           "label": "Noise",
-          "type": "textarea"
+          "type": "textarea",
+          "repeatable": true
         },
         {
           "id": "imp_odour_and_ventilation",
           "label": "Odour and Ventilation",
-          "type": "textarea"
+          "type": "textarea",
+          "repeatable": true
         },
         {
           "id": "imp_safety",
           "label": "Safety (e.g., identity improvements required to lift pumps safely)",
-          "type": "textarea"
+          "type": "textarea",
+          "repeatable": true
         },
         {
           "id": "imp_safety_2",
           "label": "Safety (e.g., identify electrical safety improvements)",
-          "type": "textarea"
+          "type": "textarea",
+          "repeatable": true
         },
         {
           "id": "imp_water_meter_rpzv_device",
           "label": "Water Meter & RPZV Device",
-          "type": "textarea"
+          "type": "textarea",
+          "repeatable": true
         },
         {
           "id": "imp_public_safety",
           "label": "Public Safety",
-          "type": "textarea"
+          "type": "textarea",
+          "repeatable": true
         },
         {
           "id": "imp_bypass_connection_point",
           "label": "Bypass connection point",
-          "type": "textarea"
+          "type": "textarea",
+          "repeatable": true
         },
         {
           "id": "imp_drain_pipe_valve_chamber_to_wet",
           "label": "Drain-pipe valve chamber to wet well",
-          "type": "textarea"
+          "type": "textarea",
+          "repeatable": true
         },
         {
           "id": "imp_scour_gas_release_chamber",
           "label": "Scour & Gas Release Chamber",
-          "type": "textarea"
+          "type": "textarea",
+          "repeatable": true
         },
         {
           "id": "imp_zero_manhole",
           "label": "Zero Manhole",
-          "type": "textarea"
-        }
-      ],
-      "stage": "field"
-    },
-    {
-      "id": "photos",
-      "title": "Site photos",
-      "kind": "photos",
-      "hint": "The standing Appendix 1 shots. Anything you photograph on an asset is added here too.",
-      "groups": [
-        {
-          "id": "site_site_layout",
-          "label": "Site Layout"
-        },
-        {
-          "id": "site_switchboard",
-          "label": "Switchboard"
-        },
-        {
-          "id": "site_davit_base",
-          "label": "Davit Base"
-        },
-        {
-          "id": "site_top_slab",
-          "label": "Top Slab"
-        },
-        {
-          "id": "site_bypass_point",
-          "label": "Bypass point"
-        },
-        {
-          "id": "site_property_pole",
-          "label": "Property Pole"
-        },
-        {
-          "id": "site_wet_well",
-          "label": "Wet Well"
-        },
-        {
-          "id": "site_vent_pole",
-          "label": "Vent Pole"
-        },
-        {
-          "id": "site_zero_mh",
-          "label": "Zero MH"
+          "type": "textarea",
+          "repeatable": true
         }
       ],
       "stage": "field"
@@ -342,11 +371,12 @@ window.SPS_SCHEMA = {
     {
       "id": "details",
       "title": "SPS details",
-      "hint": "Table 1. Placeholders show the format the template expects.",
+      "hint": "Table 1. Placeholders show the format the template expects. Two of something? Add another to that row.",
       "fields": [
         {
           "id": "det_emergency_storage",
           "label": "Emergency Storage",
+          "repeatable": true,
           "type": "textarea"
         },
         {
@@ -362,79 +392,93 @@ window.SPS_SCHEMA = {
         {
           "id": "det_pump_station_well_manufacture_type",
           "label": "Pump Station Well Manufacture Type",
+          "repeatable": true,
           "type": "textarea"
         },
         {
           "id": "det_build_date",
           "label": "Build Date",
+          "repeatable": true,
           "type": "text",
           "placeholder": "Maximo - XX/XX/XXXX (ID:XXXXXXX)"
         },
         {
           "id": "det_well_no_1_diameter",
           "label": "Well No.1 – Diameter",
+          "repeatable": true,
           "type": "text",
           "placeholder": "XXXX mm"
         },
         {
           "id": "det_well_no_1_depth",
           "label": "Well No 1 - Depth",
+          "repeatable": true,
           "type": "text",
           "placeholder": "XXXX mm"
         },
         {
           "id": "det_zero_maintenance_hole_diameter",
           "label": "Zero maintenance hole diameter",
+          "repeatable": true,
           "type": "text"
         },
         {
           "id": "det_zero_maintenance_hole_access_cover_internal",
           "label": "Zero maintenance hole access cover internal diameter",
+          "repeatable": true,
           "type": "text"
         },
         {
           "id": "det_zero_maintenance_hole_invert_level",
           "label": "Zero maintenance hole invert level",
+          "repeatable": true,
           "type": "text",
           "placeholder": "SL: XX.XX (from uMap)IL: X.XX (from uMap)"
         },
         {
           "id": "det_zero_maintenance_hole_depth_from_top",
           "label": "Zero maintenance hole depth from top of cover",
+          "repeatable": true,
           "type": "text",
           "placeholder": "X.XX (from uMap)"
         },
         {
           "id": "det_incoming_pipe_diameter",
           "label": "Incoming Pipe Diameter",
+          "repeatable": true,
           "type": "text",
           "placeholder": "XXX mm"
         },
         {
           "id": "det_outgoing_pipe_diameter_srm_mainline",
           "label": "Outgoing Pipe Diameter – SRM mainline",
+          "repeatable": true,
           "type": "text",
           "placeholder": "XXX mm"
         },
         {
           "id": "det_inlet_isolation_valve_sv_kgv_penstock",
           "label": "Inlet Isolation Valve – SV, KGV, Penstock",
+          "repeatable": true,
           "type": "text",
           "placeholder": "XXX mm (SV, KGV, Penstock) (ID: XXXXXXX)"
         },
         {
           "id": "det_spindle_to_inlet_valve",
           "label": "Spindle to Inlet Valve",
+          "repeatable": true,
           "type": "textarea"
         },
         {
           "id": "det_wet_well_inlet_pipe_type",
           "label": "Wet Well Inlet Pipe Type",
+          "repeatable": true,
           "type": "textarea"
         },
         {
           "id": "det_wet_well_inlet_pipe_suitable_for",
           "label": "Wet Well Inlet Pipe Suitable for Reuse?",
+          "repeatable": true,
           "type": "text",
           "choices": [
             "Yes",
@@ -445,41 +489,49 @@ window.SPS_SCHEMA = {
         {
           "id": "det_discharge_pipe_condition_through_wall_reuse",
           "label": "Discharge pipe condition Through wall – Reuse or Replace",
+          "repeatable": true,
           "type": "textarea"
         },
         {
           "id": "det_discharge_bends",
           "label": "Discharge Bends (Riser Bends)",
+          "repeatable": true,
           "type": "textarea"
         },
         {
           "id": "det_support_brackets_vertical_well_pipes",
           "label": "Support Brackets – Vertical well pipes",
+          "repeatable": true,
           "type": "textarea"
         },
         {
           "id": "det_sluice_valve_condition_1_2",
           "label": "Sluice Valve Condition – 1 & 2",
+          "repeatable": true,
           "type": "textarea"
         },
         {
           "id": "det_check_valve_condition_1_2",
           "label": "Check Valve Condition – 1 & 2",
+          "repeatable": true,
           "type": "textarea"
         },
         {
           "id": "det_extension_spindle_to_all_sluice_valves",
           "label": "Extension Spindle to all Sluice Valves",
+          "repeatable": true,
           "type": "textarea"
         },
         {
           "id": "det_spindle_access_cover_condition",
           "label": "Spindle Access Cover – Condition",
+          "repeatable": true,
           "type": "textarea"
         },
         {
           "id": "det_do_any_fittings_require_replacement_inside",
           "label": "Do any fittings require replacement inside well",
+          "repeatable": true,
           "type": "text",
           "choices": [
             "Yes",
@@ -490,6 +542,7 @@ window.SPS_SCHEMA = {
         {
           "id": "det_do_any_fittings_require_replacement_outside",
           "label": "Do any fittings require replacement outside the Well",
+          "repeatable": true,
           "type": "text",
           "choices": [
             "Yes",
@@ -500,21 +553,25 @@ window.SPS_SCHEMA = {
         {
           "id": "det_tapping_point_condition_mainly_tap_to",
           "label": "Tapping Point Condition – Mainly tap to pipe",
+          "repeatable": true,
           "type": "textarea"
         },
         {
           "id": "det_ladder_length_valve_chamber",
           "label": "Ladder length – Valve Chamber",
+          "repeatable": true,
           "type": "text"
         },
         {
           "id": "det_ladder_length_wet_well",
           "label": "Ladder Length Wet Well",
+          "repeatable": true,
           "type": "text"
         },
         {
           "id": "det_do_ladders_have_stanchions",
           "label": "Do Ladders have stanchions",
+          "repeatable": true,
           "type": "text",
           "choices": [
             "Yes",
@@ -525,21 +582,25 @@ window.SPS_SCHEMA = {
         {
           "id": "det_handrail_condition_valve_chamber_to_ww",
           "label": "Handrail Condition – Valve Chamber to WW",
+          "repeatable": true,
           "type": "textarea"
         },
         {
           "id": "det_access_cover_valve_chamber_condition",
           "label": "Access Cover Valve Chamber – Condition",
+          "repeatable": true,
           "type": "textarea"
         },
         {
           "id": "det_valve_chamber_fall_protection",
           "label": "Valve Chamber – Fall Protection",
+          "repeatable": true,
           "type": "textarea"
         },
         {
           "id": "det_rail_safe_inserts_in_place",
           "label": "Rail Safe Inserts in Place",
+          "repeatable": true,
           "type": "text",
           "choices": [
             "Yes",
@@ -550,6 +611,7 @@ window.SPS_SCHEMA = {
         {
           "id": "det_davit_s_in_place_adequate",
           "label": "Davit/s in place & adequate",
+          "repeatable": true,
           "type": "text",
           "choices": [
             "Yes",
@@ -560,21 +622,25 @@ window.SPS_SCHEMA = {
         {
           "id": "det_discharge_pipe_support_bracket_condition_valve",
           "label": "Discharge Pipe Support Bracket condition – Valve Chamber",
+          "repeatable": true,
           "type": "textarea"
         },
         {
           "id": "det_flow_meter_chamber",
           "label": "Flow Meter Chamber",
+          "repeatable": true,
           "type": "textarea"
         },
         {
           "id": "det_valve_chamber_drainage",
           "label": "Valve Chamber Drainage",
+          "repeatable": true,
           "type": "textarea"
         },
         {
           "id": "det_overflow",
           "label": "Overflow",
+          "repeatable": true,
           "type": "textarea"
         }
       ],

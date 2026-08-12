@@ -56,11 +56,31 @@ const jpeg = Buffer.from(
 );
 
 const conditionSection = schema.sections.find((s) => s.kind === "condition");
-const photoSection = schema.sections.find((s) => s.kind === "photos");
+const extraPhotos = conditionSection.extraPhotos;
+
+// Two of something: a second sluice valve and a second well's measurements.
+const repeatAsset = conditionSection.assets.find((a) => a.label === "Gate Valves / Spindles");
+const repeatField = schema.sections
+  .find((s) => s.id === "openings")
+  .fields[0];
+const instances = {
+  [repeatAsset.id]: [
+    { key: repeatAsset.id, label: "" },
+    { key: `${repeatAsset.id}__2`, label: "east" },
+  ],
+  [repeatField.id]: [
+    { key: repeatField.id, label: "" },
+    { key: `${repeatField.id}__2`, label: "Well 2" },
+  ],
+};
+values[`${repeatAsset.id}__2_rating`] = "5";
+values[`${repeatAsset.id}__2_comment`] = "Seized, spindle sheared.";
+values[`${repeatField.id}__2`] = "980";
+
 const photoGroups = [
-  photoSection.groups[0].id,
-  photoSection.groups[0].id, // two in one group, to exercise the 2-up row
-  photoSection.groups[4].id,
+  extraPhotos[0].id,
+  extraPhotos[0].id, // two in one group, to exercise the 2-up row
+  extraPhotos[1].id,
   conditionSection.assets[10].id,
   conditionSection.assets[10].id,
   conditionSection.assets[10].id, // odd count, so the last row pads a cell
@@ -87,6 +107,7 @@ const { blob, fileName } = await SPSDocx.generate({
   schema,
   values,
   photos,
+  instances,
 });
 const out = Buffer.from(await blob.arrayBuffer());
 const elapsed = Date.now() - started;
@@ -163,9 +184,63 @@ check(
   "asset photo group heading is missing its condition rating"
 );
 check(
-  documentXml.includes(photoSection.groups[0].label),
+  documentXml.includes(extraPhotos[0].label),
   "standing photo group heading is missing"
 );
+
+// --- repeated rows -----------------------------------------------------------
+check(
+  !/\{\{n:/.test(documentXml),
+  "an instance-suffix token survived into the report"
+);
+// The suffix is its own run, appended after the row's own label, so look for
+// the run rather than for a label and suffix side by side in the markup.
+check(
+  documentXml.includes('<w:t xml:space="preserve"> (east)</w:t>'),
+  `no duplicated row for the second ${repeatAsset.label}`
+);
+check(
+  documentXml.includes('<w:t xml:space="preserve"> (Well 2)</w:t>'),
+  "no duplicated row for the second well's measurement"
+);
+check(
+  documentXml.includes("Seized, spindle sheared."),
+  "the second instance's comment is missing"
+);
+check(documentXml.includes(">980<"), "the second well's measurement is missing");
+// The original row keeps its own label, unsuffixed.
+check(
+  documentXml.includes(`>${repeatAsset.label}</w:t>`),
+  "the original row lost its label"
+);
+// The second gate valve is rated 5, so its cell is shaded like any other.
+check(
+  documentXml.includes('w:fill="FFC7CE"'),
+  "the duplicated row did not pick up its own rating colour"
+);
+
+// --- the register of what was not photographed -------------------------------
+check(
+  documentXml.includes("Table 8: Assets inspected but not photographed"),
+  "the not-photographed register is missing"
+);
+const photographed = new Set(photoGroups);
+const unshot = conditionSection.assets.filter((a) => !photographed.has(a.id));
+check(unshot.length > 20, "expected most assets to be unphotographed in this fixture");
+// header + every unphotographed asset instance + the unphotographed site shot
+const registerRows =
+  1 + unshot.length + 1 /* the second gate valve */ + extraPhotos.filter(
+    (g) => !photographed.has(g.id)
+  ).length;
+check(
+  documentXml.includes(`${repeatAsset.label} (east)`),
+  "a repeated instance should appear in the register too"
+);
+const shotAsset = conditionSection.assets[10];
+const registerAfterPhotos =
+  documentXml.indexOf("Table 8: Assets inspected but not photographed") >
+  documentXml.lastIndexOf(`${shotAsset.label} — condition`);
+check(registerAfterPhotos, "the register should come after the photographs");
 
 // Rating cells carry the palette from the schema.
 for (const rating of schema.ratings) {
@@ -190,6 +265,15 @@ const blank = SPSDocx.readZip(
 const before = XMLParser(await SPSDocx.readText(blank.entries["word/document.xml"]));
 const parsed = XMLParser(documentXml);
 check(parsed.tables >= before.tables, `lost tables: ${before.tables} -> ${parsed.tables}`);
+// Two rows were duplicated and no more: one per extra instance. Counting the
+// suffix runs is exact, where a whole-document row count also picks up the
+// generated photo tables and the register.
+const suffixRuns = [...documentXml.matchAll(/<w:t xml:space="preserve"> \([^<]*\)<\/w:t>/g)];
+check(suffixRuns.length === 2, `expected 2 duplicated rows, saw ${suffixRuns.length}`);
+check(
+  parsed.rows > before.rows + registerRows,
+  `rows did not grow: ${before.rows} -> ${parsed.rows}`
+);
 check(
   parsed.sections === before.sections,
   `section breaks changed: ${before.sections} -> ${parsed.sections}` +

@@ -484,6 +484,44 @@ h2.section {
 .banner.bad { border-color: var(--danger); color: var(--danger); }
 .banner.good { border-color: var(--ok); color: var(--ok); }
 
+/* ----------------------------------------------------------- repeated rows */
+
+.addanother {
+  display: block;
+  width: 100%;
+  min-height: var(--tap);
+  margin: -2px 0 14px;
+  border: 1.5px dashed var(--line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 14.5px;
+  font-weight: 560;
+}
+
+.card .addanother { margin-bottom: 4px; }
+.focusbody .addanother { margin-top: 14px; }
+
+.instrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -2px 0 8px;
+}
+
+.instlabel {
+  flex: 0 0 auto;
+  width: 130px;
+  min-height: 38px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  font-size: 15px;
+}
+
+.instrow .textbtn { min-height: 38px; padding: 0; font-size: 14px; }
+
 /* ------------------------------------------------------- the walk-through */
 
 .stagetabs {

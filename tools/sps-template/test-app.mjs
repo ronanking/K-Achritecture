@@ -140,13 +140,13 @@ await step("a new station opens on the field work", async () => {
     "Well openings",
     "Condition assessment",
     "General improvement works",
-    "Site photos",
   ];
   if (sections.join("|") !== expected.join("|")) {
     throw new Error(`field sections wrong or out of order: ${sections.join(", ")}`);
   }
+  // 2 station + 3 openings + (29 assets + 2 site-only shots) + 11 improvements
   const total = await page.locator('.stagetab[aria-pressed="true"] .stagecount').innerText();
-  if (!total.endsWith("/ 54")) throw new Error(`field stage should hold 54 items, says ${total}`);
+  if (!total.endsWith("/ 47")) throw new Error(`field stage should hold 47 items, says ${total}`);
   await shot("02-walkthrough");
 });
 
@@ -222,7 +222,7 @@ await step("rate an asset and photograph it", async () => {
   await page.getByRole("button", { name: "Jump to another question" }).click();
   await page.locator(".focusjump").waitFor();
   const rows = await page.locator(".jumprow").count();
-  if (rows !== 54) throw new Error(`jump list should hold 54 rows, saw ${rows}`);
+  if (rows !== 47) throw new Error(`jump list should hold 47 rows, saw ${rows}`);
   await shot("04-jump");
   await page.getByRole("button", { name: /^·?\s*Signage/ }).click();
   await page.waitForTimeout(250);
@@ -257,16 +257,18 @@ await step("leaving focus returns to the walk-through", async () => {
   const rowText = await page
     .locator(".indexrow", { hasText: "Condition assessment" })
     .innerText();
-  if (!rowText.includes("1/29")) throw new Error(`walk-through count stale: ${rowText}`);
+  if (!rowText.includes("1/31")) throw new Error(`walk-through count stale: ${rowText}`);
   const title = await page.locator("#title").innerText();
   if (!title.includes("SPS-KED345")) throw new Error(`header did not pick up the name: ${title}`);
 });
 
 await step("the list view still works for the rest of a section", async () => {
   await page.getByRole("button", { name: /^Condition assessment/ }).click();
-  const cards = page.locator(".assetcard");
-  await cards.first().waitFor();
-  if ((await cards.count()) !== 29) throw new Error("expected 29 asset cards");
+  // The two photo-only site shots sit in this section too; only the rated
+  // assets take a rating.
+  const cards = page.locator(".assetcard:not(.photoonly)");
+  await page.locator(".assetcard").first().waitFor();
+  if ((await cards.count()) !== 29) throw new Error(`expected 29 rated assets, saw ${await cards.count()}`);
   for (const [i, rating] of [2, 5, 3].entries()) {
     const card = cards.nth(i + 1);
     await card.locator(`.rating[data-value="${rating}"]`).click();
@@ -274,12 +276,12 @@ await step("the list view still works for the rest of a section", async () => {
   }
   await page.waitForTimeout(400);
   const tally = await page.locator('.chip[aria-current="true"] .tally').innerText();
-  if (tally !== "4/29") throw new Error(`chip tally stale: ${tally}`);
+  if (tally !== "4/31") throw new Error(`chip tally stale: ${tally}`);
   await shot("06-list");
 });
 
 await step("photographing deep in the list holds your place", async () => {
-  const card = page.locator(".assetcard").nth(21);
+  const card = page.locator(".assetcard:not(.photoonly)").nth(21);
   await card.scrollIntoViewIfNeeded();
   const before = await page.evaluate(() => window.scrollY);
   await card.getByRole("button", { name: /^Take a photo/ }).click();
@@ -299,14 +301,64 @@ await step("well openings and improvement works are field work", async () => {
   await page.waitForTimeout(400);
 });
 
-await step("site photo groups", async () => {
-  await page.getByRole("button", { name: /^Site photos/ }).click();
-  const cards = page.locator("main .card");
-  if ((await cards.count()) !== 9) throw new Error("expected 9 standing photo groups");
-  await cards.first().getByRole("button", { name: /library/i }).click();
+await step("the site-only shots live with the condition rows", async () => {
+  await page.getByRole("button", { name: /^Condition assessment/ }).click();
+  const photoOnly = page.locator(".assetcard", { hasText: "photo only" });
+  if ((await photoOnly.count()) !== 2) {
+    throw new Error("expected Site Layout and Top Slab alongside the rated assets");
+  }
+  // The rest — Switchboard, Wet Well, Davit Base — are photographed on the row
+  // you rate them on, not in a section of their own.
+  if ((await page.locator(".assetcard", { hasText: "Switchboard" }).count()) !== 1) {
+    throw new Error("Switchboard should appear once, on its condition row");
+  }
+  await photoOnly.first().getByRole("button", { name: /library/i }).click();
   await page.locator("#library").setInputFiles(jpegPath);
   await page.waitForTimeout(900);
   await shot("07-sitephotos");
+});
+
+await step("a row can hold a second of something", async () => {
+  await page.getByRole("button", { name: /^Well openings/ }).click();
+  const values = page.locator("main .field input:not(.instlabel)");
+  const before = await values.count();
+  await page.getByRole("button", { name: /Another l1/i }).click();
+  await page.waitForTimeout(500);
+  if ((await values.count()) !== before + 1) {
+    throw new Error(`adding a second L1 gave ${before} -> ${await values.count()} value inputs`);
+  }
+  if ((await page.locator(".instlabel").count()) !== 1) {
+    throw new Error("the copy has no name field");
+  }
+
+  await page.locator(".instlabel").first().fill("Well 2");
+  await values.nth(1).fill("980");
+  await page.waitForTimeout(500);
+
+  const labels = await page.locator("main .field > label").allInnerTexts();
+  if (!labels.some((l) => l.includes("L1 (mm) (Well 2)"))) {
+    throw new Error(`the copy is not named: ${labels.join(" / ")}`);
+  }
+  await shot("08-repeat");
+});
+
+await step("a second sluice valve gets its own rating", async () => {
+  await page.getByRole("button", { name: /^Condition assessment/ }).click();
+  await page.locator(".assetcard", { hasText: "Gate Valves / Spindles" }).first()
+    .scrollIntoViewIfNeeded();
+  await page.getByRole("button", { name: /Another gate valves/i }).click();
+  await page.waitForTimeout(600);
+  const copies = page.locator(".assetcard", { hasText: "Gate Valves / Spindles" });
+  if ((await copies.count()) !== 2) throw new Error("no second gate valve row");
+  await copies.nth(1).locator('.rating[data-value="5"]').click();
+  await copies.nth(1).locator("textarea").fill("Seized, spindle sheared.");
+  await page.waitForTimeout(500);
+  if ((await copies.nth(1).getAttribute("data-rating")) !== "5") {
+    throw new Error("the copy did not take its own rating");
+  }
+  if ((await copies.nth(0).getAttribute("data-rating")) === "5") {
+    throw new Error("rating the copy changed the original");
+  }
 });
 
 await step("the desk stage holds the rest", async () => {
@@ -379,7 +431,7 @@ await step("data survives a reload", async () => {
   await page.reload({ waitUntil: "networkidle" });
   await page.getByText("SPS-KED345").first().waitFor({ timeout: 5000 });
   const meta = await page.locator(".stationlist .meta").first().innerText();
-  if (!/4 of 29 assets rated/.test(meta)) throw new Error(`list meta wrong: ${meta}`);
+  if (!/5 of 30 assets rated/.test(meta)) throw new Error(`list meta wrong: ${meta}`);
   if (!/3 photos/.test(meta)) throw new Error(`photo count wrong: ${meta}`);
   await shot("10-list");
 });

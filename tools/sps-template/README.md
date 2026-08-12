@@ -49,6 +49,35 @@ answers — and the app opens there. Everything that needs Maximo, uMap or the
 master plan sits behind the Desk tab. Move a section between the two lists and
 the ordering, the stage tabs and the walk-through all follow.
 
+### Two of something
+
+Every labelled row in tables 1, 3, 4 and 5 can be repeated. Two sluice valves,
+three wells worth of opening measurements, a second pump — hit **+ Another** on
+the row and it gains a copy directly beneath, with its own rating, comment and
+photographs. Name the copy (`east`, `Well 2`, `SV2`) or leave it numbered; the
+report duplicates the `w:tr` and suffixes the label, `Gate Valves / Spindles
+(east)`.
+
+Instance one keeps the original field ids, so nothing already captured moves,
+and keys are never reused — deleting the middle of three cannot make a later
+copy inherit the deleted one's answers.
+
+### Photographs live on the thing they are of
+
+The template's nine standing Appendix 1 shots are mostly of something that
+already has a condition row, so they were folded into it: rate the driveway and
+photograph it in the same place. `PHOTO_GROUP_MERGES` in `build.py` is the map,
+asserted against the template at build time. The two that are of the site
+rather than an asset — Site Layout, Top Slab — stay as photo-only entries in
+the same section.
+
+Appendix 1 then shows only what was actually photographed, and a register
+follows it — *Table 8: Assets inspected but not photographed* — listing
+everything else with its condition rating, so a gap in the evidence is stated
+rather than left to be noticed.
+
+### Getting round
+
 Opening a station lands on the walk-through: two stage tabs, one button that
 drops you back where you stopped, and the sections as an index. From there
 **focus mode** takes over the screen and asks one question at a time — a large
@@ -108,14 +137,16 @@ then go offline and prove it still works. Screenshots land in `.sps-test/app/`.
 | `{{para:ID}}` | the whole paragraph, replaced by one paragraph per line |
 | `{{list:ID}}` | the whole paragraph, replaced by a bulleted list |
 | `{{img:ID}}` | the whole paragraph, replaced by a centred image |
-| `{{photos}}` | the whole of Appendix 1 |
+| `{{n:ID}}` | nothing on the original row, ` (2)` on a repeat of it |
+| `{{photos}}` | the whole of Appendix 1, plus the not-photographed register |
 
 ## Notes on the report
 
 - **Appendix 1 is generated, not filled.** The template ships nine fixed photo
-  slots; the app writes a table per group that actually has photos — the nine
-  standing shots first, then every condition asset that was photographed, with
+  slots; the app writes a table per group that actually has photos — the
+  site-only shots first, then every condition asset that was photographed, with
   its rating in the heading. Two photos across, matching the original layout.
+  Anything not photographed is listed in the register that follows.
 - **`SPS-XXXXXX` is a live placeholder.** Type it anywhere and it is replaced
   with the station number on export. The bypass boilerplate in section 4.1
   relies on this.

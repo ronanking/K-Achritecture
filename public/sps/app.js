@@ -155,7 +155,6 @@
   var fieldsById = Object.create(null);
   var sectionsById = Object.create(null);
   var conditionSection = null;
-  var photoSection = null;
 
   schema.sections.forEach(function (section) {
     sectionsById[section.id] = section;
@@ -163,7 +162,6 @@
       fieldsById[field.id] = field;
     });
     if (section.kind === "condition") conditionSection = section;
-    if (section.kind === "photos") photoSection = section;
   });
 
   // Names and dates that stay the same from one station to the next.
@@ -221,38 +219,19 @@
     return String(value == null ? "" : value).trim().length > 0;
   }
 
-  /* How much of a section is done, for the tallies on the section chips. */
-  function progressOf(station, section, photoCounts) {
-    var done = 0;
-    var total = 0;
-    if (section.kind === "condition") {
-      section.assets.forEach(function (asset) {
-        total += 1;
-        if (isFilled(station.values[asset.id + "_rating"])) done += 1;
-      });
-    } else if (section.kind === "photos") {
-      section.groups.forEach(function (group) {
-        total += 1;
-        if (photoCounts[group.id]) done += 1;
-      });
-    } else {
-      (section.fields || []).forEach(function (field) {
-        total += 1;
-        if (field.type === "image") {
-          if (photoCounts[field.id]) done += 1;
-        } else if (isFilled(station.values[field.id])) {
-          done += 1;
-        }
-      });
-    }
-    return { done: done, total: total };
+  /* How much of a section is done, for the tallies on the section chips.
+   * Counted off the same flattened item list the walk-through steps through,
+   * so a repeated row is counted once per instance in both places. */
+  function progressOf(station, section, counts) {
+    var items = itemsInSection(station, section);
+    return { done: countAnswered(station, items, counts), total: items.length };
   }
 
-  function overallProgress(station, photoCounts) {
+  function overallProgress(station, counts) {
     var done = 0;
     var total = 0;
     schema.sections.forEach(function (section) {
-      var part = progressOf(station, section, photoCounts);
+      var part = progressOf(station, section, counts);
       done += part.done;
       total += part.total;
     });
@@ -269,52 +248,132 @@
     });
   }
 
+  // ------------------------------------------------------------ instances --
+
+  /* A row in the template is one row, but a station can have two sluice
+   * valves, or three wells worth of opening measurements. Instances are the
+   * extra copies: instance one keeps the original ids so nothing already
+   * captured has to move, and each extra gets `__2`, `__3` appended. */
+  function instancesOf(station, baseId) {
+    var extra = (station.instances || {})[baseId] || [];
+    return [{ key: baseId, label: "", ordinal: 1 }].concat(
+      extra.map(function (instance, i) {
+        return { key: instance.key, label: instance.label || String(i + 2), ordinal: i + 2 };
+      })
+    );
+  }
+
+  function instancesForEntry(station, entry) {
+    if (!entry.repeatable) return [{ key: entry.id, label: "", ordinal: 1 }];
+    return instancesOf(station, entry.id);
+  }
+
+  function addInstance(baseId) {
+    var all = (current.station.instances = current.station.instances || {});
+    var list = (all[baseId] = all[baseId] || []);
+    // Keys are never reused, so deleting the middle of three cannot make a
+    // later instance inherit the deleted one's answers.
+    var used = list.map(function (instance) {
+      return parseInt(String(instance.key).split("__")[1], 10) || 1;
+    });
+    var next = Math.max.apply(null, [1].concat(used)) + 1;
+    var created = { key: baseId + "__" + next, label: String(list.length + 2) };
+    list.push(created);
+    saveNow();
+    return created;
+  }
+
+  function removeInstance(baseId, key) {
+    var all = current.station.instances || {};
+    all[baseId] = (all[baseId] || []).filter(function (instance) {
+      return instance.key !== key;
+    });
+    Object.keys(current.station.values).forEach(function (id) {
+      if (id === key || id.indexOf(key + "_") === 0) delete current.station.values[id];
+    });
+    return Promise.all(
+      photosIn(key).map(function (photo) {
+        return store.deletePhoto(photo.id);
+      })
+    )
+      .then(saveNow)
+      .then(refreshPhotos);
+  }
+
+  function labelWith(label, instance) {
+    return instance && instance.label ? label + " (" + instance.label + ")" : label;
+  }
+
   /* One flat, ordered list of everything that needs an answer in a stage.
    *
    * Focus mode walks this: a field, a rated asset, or a photo group is one
    * screen each. The scrolling list renders the same things grouped by
    * section — same items, same order, two ways of looking at them. */
-  function itemsInStage(stageId) {
+  function itemsInSection(station, section) {
     var items = [];
-    sectionsInStage(stageId).forEach(function (section) {
-      (section.fields || []).forEach(function (field) {
-        items.push({ kind: "field", section: section, field: field, id: field.id });
+    (section.extraPhotos || []).forEach(function (group) {
+      items.push({
+        kind: "group", section: section, group: group,
+        key: group.id, instance: null, base: group.id,
       });
-      (section.assets || []).forEach(function (asset) {
-        items.push({ kind: "asset", section: section, asset: asset, id: asset.id });
+    });
+    (section.fields || []).forEach(function (field) {
+      instancesForEntry(station, field).forEach(function (instance) {
+        items.push({
+          kind: "field", section: section, field: field,
+          key: instance.key, instance: instance, base: field.id,
+        });
       });
-      (section.groups || []).forEach(function (group) {
-        items.push({ kind: "group", section: section, group: group, id: group.id });
+    });
+    (section.assets || []).forEach(function (asset) {
+      instancesForEntry(station, asset).forEach(function (instance) {
+        items.push({
+          kind: "asset", section: section, asset: asset,
+          key: instance.key, instance: instance, base: asset.id,
+        });
       });
     });
     return items;
   }
 
-  function itemLabel(item) {
-    if (item.kind === "asset") return item.asset.label;
-    if (item.kind === "group") return item.group.label;
-    return item.field.column
-      ? item.field.label + " — " + item.field.column
-      : item.field.label;
+  function itemsInStage(station, stageId) {
+    var items = [];
+    sectionsInStage(stageId).forEach(function (section) {
+      items = items.concat(itemsInSection(station, section));
+    });
+    return items;
   }
 
-  function itemAnswered(item, counts) {
-    counts = counts || photoCounts();
-    if (item.kind === "asset") {
-      return isFilled(current.station.values[item.asset.id + "_rating"]);
-    }
-    if (item.kind === "group") return !!counts[item.group.id];
-    if (item.field.type === "image") return !!counts[item.field.id];
-    return isFilled(current.station.values[item.field.id]);
+  function itemLabel(item) {
+    if (item.kind === "asset") return labelWith(item.asset.label, item.instance);
+    if (item.kind === "group") return item.group.label;
+    var base = item.field.column
+      ? item.field.label + " — " + item.field.column
+      : item.field.label;
+    return labelWith(base, item.instance);
+  }
+
+  function itemAnswered(station, item, counts) {
+    if (item.kind === "asset") return isFilled(station.values[item.key + "_rating"]);
+    if (item.kind === "group") return !!counts[item.key];
+    if (item.field.type === "image") return !!counts[item.key];
+    return isFilled(station.values[item.key]);
+  }
+
+  function countAnswered(station, items, counts) {
+    return items.filter(function (item) {
+      return itemAnswered(station, item, counts);
+    }).length;
   }
 
   function stageProgress(stageId) {
     var counts = photoCounts();
-    var items = itemsInStage(stageId);
-    var done = items.filter(function (item) {
-      return itemAnswered(item, counts);
-    }).length;
-    return { done: done, total: items.length, items: items };
+    var items = itemsInStage(current.station, stageId);
+    return {
+      done: countAnswered(current.station, items, counts),
+      total: items.length,
+      items: items,
+    };
   }
 
   /* Where to drop someone who taps Resume: the first thing still unanswered,
@@ -322,7 +381,7 @@
   function firstUnanswered(items) {
     var counts = photoCounts();
     for (var i = 0; i < items.length; i++) {
-      if (!itemAnswered(items[i], counts)) return i;
+      if (!itemAnswered(current.station, items[i], counts)) return i;
     }
     return 0;
   }
@@ -530,15 +589,19 @@
 
   var saveTimer = null;
 
-  function setValue(id, value) {
-    current.station.values[id] = value;
-    updateProgressChrome();
+  function scheduleSave() {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(function () {
       store.putStation(current.station).catch(function () {
         toast("Could not save — the phone may be out of storage");
       });
     }, 350);
+  }
+
+  function setValue(id, value) {
+    current.station.values[id] = value;
+    updateProgressChrome();
+    scheduleSave();
   }
 
   function saveNow() {
@@ -650,9 +713,12 @@
       var shots = Object.keys(counts).reduce(function (total, key) {
         return total + counts[key];
       }, 0);
-      var rated = conditionSection.assets.filter(function (asset) {
-        return isFilled(station.values[asset.id + "_rating"]);
-      }).length;
+      // Rated assets only — the site-only shots in this section are counted
+      // by the photo tally beside it, not by this one.
+      var conditionItems = itemsInSection(station, conditionSection).filter(function (item) {
+        return item.kind === "asset";
+      });
+      var rated = countAnswered(station, conditionItems, counts);
 
       list.appendChild(
         el("li", {}, [
@@ -670,7 +736,7 @@
               el("div", {
                 class: "meta",
                 text:
-                  rated + " of " + conditionSection.assets.length + " assets rated · " +
+                  rated + " of " + conditionItems.length + " assets rated · " +
                   shots + (shots === 1 ? " photo" : " photos") + " · edited " +
                   relativeDay(station.updatedAt),
               }),
@@ -730,6 +796,32 @@
 
   // -- one station ----------------------------------------------------------
 
+  /* The standing Appendix 1 shots used to be a section of their own, keyed
+   * `site_*`. Most are now taken against the condition row they belong to, so
+   * anything captured under the old key is moved across rather than orphaned. */
+  var PHOTO_GROUP_MOVES = {
+    site_switchboard: "cond_switchboard",
+    site_davit_base: "cond_davit_base",
+    site_bypass_point: "cond_bypass",
+    site_property_pole: "cond_property_pole",
+    site_wet_well: "cond_wet_well_wall",
+    site_vent_pole: "cond_vent_pole_base",
+    site_zero_mh: "cond_zero_maintenance_hole",
+  };
+
+  function migratePhotoGroups() {
+    var moving = current.photos.filter(function (photo) {
+      return PHOTO_GROUP_MOVES[photo.group];
+    });
+    if (!moving.length) return Promise.resolve();
+    return Promise.all(
+      moving.map(function (photo) {
+        photo.group = PHOTO_GROUP_MOVES[photo.group];
+        return store.putPhoto(photo);
+      })
+    ).then(refreshPhotos);
+  }
+
   function openStation(id) {
     return store.getStation(id).then(function (station) {
       current.station = station;
@@ -737,10 +829,12 @@
       current.sectionId = "__walk";
       current.stage = "field";
       current.focus = null;
-      return refreshPhotos().then(function () {
-        window.scrollTo(0, 0);
-        render();
-      });
+      return refreshPhotos()
+        .then(migratePhotoGroups)
+        .then(function () {
+          window.scrollTo(0, 0);
+          render();
+        });
     });
   }
 
@@ -790,7 +884,6 @@
     if (section.hint) app.appendChild(el("p", { class: "lede", text: section.hint }));
 
     if (section.kind === "condition") renderCondition(section);
-    else if (section.kind === "photos") renderPhotoGroups(section);
     else renderFields(section);
   }
 
@@ -905,7 +998,7 @@
   // -- focus mode -----------------------------------------------------------
 
   function enterFocus(index) {
-    var items = itemsInStage(current.stage);
+    var items = itemsInStage(current.station, current.stage);
     current.focus = { index: Math.max(0, Math.min(index, items.length - 1)) };
     window.scrollTo(0, 0);
     render();
@@ -919,7 +1012,7 @@
   }
 
   function stepFocus(delta) {
-    var items = itemsInStage(current.stage);
+    var items = itemsInStage(current.station, current.stage);
     var next = current.focus.index + delta;
     if (next < 0) return;
     if (next >= items.length) return exitFocus();
@@ -931,7 +1024,7 @@
   }
 
   function renderFocus() {
-    var items = itemsInStage(current.stage);
+    var items = itemsInStage(current.station, current.stage);
     var index = Math.min(current.focus.index, items.length - 1);
     var item = items[index];
     if (!item) return exitFocus();
@@ -941,7 +1034,7 @@
     // -- header: where you are, and the way out
     var counts = photoCounts();
     var done = items.filter(function (each) {
-      return itemAnswered(each, counts);
+      return itemAnswered(current.station, each, counts);
     }).length;
 
     screen.appendChild(
@@ -987,30 +1080,54 @@
 
     // -- the one question
     var body = el("div", { class: "focusbody", "data-rating": "" });
-    body.appendChild(el("h2", { class: "focusq", text: itemLabel(item) }));
+    var question = el("h2", { class: "focusq", text: itemLabel(item) });
+    body.appendChild(question);
 
     if (item.kind === "asset") {
-      body.setAttribute("data-rating", current.station.values[item.asset.id + "_rating"] || "");
+      body.setAttribute("data-rating", current.station.values[item.key + "_rating"] || "");
       body.appendChild(
         el("p", { class: "focushint", text: "How would you rate its condition?" })
       );
-      assetControls(item.asset, body).forEach(function (node) {
+      if (item.instance.ordinal > 1) {
+        body.appendChild(
+          instanceControls(item.asset.id, item.instance, function (named) {
+            question.textContent = item.asset.label + " (" + named + ")";
+          })
+        );
+      }
+      assetControls(item.asset, item.instance, body).forEach(function (node) {
         body.appendChild(node);
       });
     } else if (item.kind === "group") {
       body.appendChild(
         el("p", { class: "focushint", text: "Photograph it for Appendix 1." })
       );
-      body.appendChild(renderShots(item.group.id, item.group.label));
+      body.appendChild(renderShots(item.key, item.group.label));
     } else {
       if (item.field.help) {
         body.appendChild(el("p", { class: "focushint", text: item.field.help }));
       }
-      var field = renderField(item.field);
+      var field = renderField(item.field, item.instance);
       // The label is already the question, in full size, above.
       var label = field.querySelector("label");
       if (label) field.removeChild(label);
       body.appendChild(field);
+    }
+
+    // A second of this thing, added right here and stepped straight into.
+    var repeatable = item.kind === "asset" ? item.asset : item.kind === "field" ? item.field : null;
+    if (repeatable && repeatable.repeatable) {
+      body.appendChild(
+        addAnotherButton(repeatable, repeatable.label, function () {
+          var grown = itemsInStage(current.station, current.stage);
+          var landing = grown.findIndex(function (each) {
+            return each.base === repeatable.id && each.instance && each.instance.ordinal > 1 &&
+              !itemAnswered(current.station, each, photoCounts());
+          });
+          current.focus.index = landing < 0 ? index + 1 : landing;
+          render();
+        })
+      );
     }
 
     screen.appendChild(body);
@@ -1052,7 +1169,7 @@
         lastSection = item.section.id;
         list.appendChild(el("h3", { class: "jumpsection", text: item.section.title }));
       }
-      var answered = itemAnswered(item, counts);
+      var answered = itemAnswered(current.station, item, counts);
       list.appendChild(
         el(
           "button",
@@ -1152,57 +1269,127 @@
     }
   }
 
+  // -- repeated rows --------------------------------------------------------
+
+  /* "Two sluice valves, three wells." One button per repeatable row, which
+   * adds a copy of it right underneath. */
+  function addAnotherButton(entry, label, after) {
+    return el("button", {
+      class: "addanother",
+      type: "button",
+      text: "+ Another " + label.toLowerCase(),
+      onclick: function () {
+        var created = addInstance(entry.id);
+        if (after) return after(created);
+        renderKeepingScroll();
+        toast("Added " + labelWith(label, created));
+      },
+    });
+  }
+
+  /* A copy can be named — "east", "SV2", "Well 2" — and removed. The first is
+   * the template's own row and gets neither. */
+  function instanceControls(baseId, instance, onRename) {
+    var name = el("input", {
+      class: "instlabel",
+      type: "text",
+      value: instance.label,
+      placeholder: String(instance.ordinal),
+      "aria-label": "Name for this one",
+    });
+    name.addEventListener("input", function () {
+      var all = current.station.instances || {};
+      (all[baseId] || []).forEach(function (each) {
+        if (each.key === instance.key) each.label = name.value;
+      });
+      instance.label = name.value;
+      if (onRename) onRename(name.value || String(instance.ordinal));
+      scheduleSave();
+    });
+
+    return el("div", { class: "instrow" }, [
+      name,
+      el("button", {
+        class: "textbtn danger",
+        type: "button",
+        text: "Remove",
+        onclick: function () {
+          if (!window.confirm("Remove this one and anything recorded against it?")) return;
+          removeInstance(baseId, instance.key).then(function () {
+            if (current.focus) {
+              current.focus.index = Math.max(0, current.focus.index - 1);
+              render();
+            } else {
+              renderKeepingScroll();
+            }
+            toast("Removed");
+          });
+        },
+      }),
+    ]);
+  }
+
   // -- plain field sections -------------------------------------------------
 
   function renderFields(section) {
     var container = el("div", { class: section.columns ? "card grid2" : "card" });
     section.fields.forEach(function (field) {
-      container.appendChild(renderField(field));
+      instancesForEntry(current.station, field).forEach(function (instance) {
+        container.appendChild(renderField(field, instance));
+      });
+      if (field.repeatable) container.appendChild(addAnotherButton(field, field.label));
     });
     app.appendChild(container);
   }
 
-  function renderField(field) {
-    var value = current.station.values[field.id] || "";
+  function renderField(field, instance) {
+    var valueId = (instance && instance.key) || field.id;
+    var value = current.station.values[valueId] || "";
     var wrap = el("div", { class: "field" + (isFilled(value) ? " filled" : "") });
-    var label = el("label", { for: "f_" + field.id });
-    label.appendChild(
-      document.createTextNode(field.column ? field.label + " — " + field.column : field.label)
-    );
+    var label = el("label", { for: "f_" + valueId });
+    var text = field.column ? field.label + " — " + field.column : field.label;
+    label.appendChild(document.createTextNode(labelWith(text, instance)));
     if (field.help) label.appendChild(el("span", { class: "help", text: field.help }));
     wrap.appendChild(label);
+    if (instance && instance.ordinal > 1) {
+      wrap.appendChild(
+        instanceControls(field.id, instance, function (named) {
+          label.firstChild.nodeValue = text + " (" + named + ")";
+        })
+      );
+    }
 
     if (field.type === "image") {
-      wrap.appendChild(renderImageField(field));
+      wrap.appendChild(renderImageField(field, valueId));
       return wrap;
     }
 
     var input;
     if (field.type === "textarea" || field.type === "lines") {
       input = el("textarea", {
-        id: "f_" + field.id,
+        id: "f_" + valueId,
         rows: field.type === "lines" ? 4 : 2,
         placeholder: field.type === "lines" ? "One item per line" : field.placeholder || "",
       });
       input.value = value;
       input.addEventListener("input", function () {
         autoGrow(input);
-        setValue(field.id, input.value);
+        setValue(valueId, input.value);
         wrap.classList.toggle("filled", isFilled(input.value));
       });
       requestAnimationFrame(function () {
         autoGrow(input);
       });
     } else if (field.type === "date") {
-      input = el("input", { id: "f_" + field.id, type: "date" });
+      input = el("input", { id: "f_" + valueId, type: "date" });
       input.value = toIsoDate(value);
       input.addEventListener("change", function () {
-        setValue(field.id, fromIsoDate(input.value));
+        setValue(valueId, fromIsoDate(input.value));
         wrap.classList.toggle("filled", isFilled(input.value));
       });
     } else {
       input = el("input", {
-        id: "f_" + field.id,
+        id: "f_" + valueId,
         type: "text",
         placeholder: field.placeholder || "",
         inputmode: field.inputMode || false,
@@ -1210,7 +1397,7 @@
       });
       input.value = value;
       input.addEventListener("input", function () {
-        setValue(field.id, input.value);
+        setValue(valueId, input.value);
         wrap.classList.toggle("filled", isFilled(input.value));
         if (field.id === "sps_id") {
           titleNode.firstChild.textContent = stationName(current.station);
@@ -1229,7 +1416,7 @@
           onclick: function () {
             var next = input.value === choice ? "" : choice;
             input.value = next;
-            setValue(field.id, next);
+            setValue(valueId, next);
             wrap.classList.toggle("filled", isFilled(next));
             picks.querySelectorAll(".quickpick").forEach(function (other) {
               other.setAttribute("aria-pressed", String(other.textContent === next));
@@ -1245,9 +1432,9 @@
     return wrap;
   }
 
-  function renderImageField(field) {
+  function renderImageField(field, valueId) {
     var wrap = el("div", {});
-    var existing = photosIn(field.id)[0];
+    var existing = photosIn(valueId)[0];
     if (existing) {
       wrap.appendChild(el("img", { class: "figure", src: thumbUrl(existing), alt: field.label }));
       wrap.appendChild(
@@ -1270,7 +1457,7 @@
             type: "button",
             text: "Choose image",
             onclick: function () {
-              pickPhotos(field.id, false);
+              pickPhotos(valueId, false);
             },
           }),
         ])
@@ -1282,37 +1469,64 @@
   // -- the condition table --------------------------------------------------
 
   function renderCondition(section) {
-    var rated = section.assets.filter(function (asset) {
-      return isFilled(current.station.values[asset.id + "_rating"]);
-    }).length;
+    var items = itemsInSection(current.station, section);
+    var counts = photoCounts();
+    var rated = countAnswered(current.station, items, counts);
 
     app.appendChild(
-      el("div", { class: "banner" + (rated === section.assets.length ? " good" : "") }, [
+      el("div", { class: "banner" + (rated === items.length ? " good" : "") }, [
         el("span", {
           text:
-            rated + " of " + section.assets.length + " rated." +
-            (rated === section.assets.length ? " All done." : " Unrated assets are left blank in the report."),
+            rated + " of " + items.length + " rated." +
+            (rated === items.length
+              ? " All done."
+              : " Unrated assets are left blank in the report."),
         }),
       ])
     );
 
-    section.assets.forEach(function (asset, i) {
-      app.appendChild(renderAsset(asset, i, section.assets.length));
+    // The template's standing site shots that are not of a rateable asset —
+    // the site layout, the top slab — are photographed here too, so the whole
+    // walk is one list.
+    (section.extraPhotos || []).forEach(function (group) {
+      var card = el("div", { class: "card assetcard photoonly" }, [
+        el("h3", {}, [
+          el("span", { text: group.label }),
+          el("span", { class: "idx", text: "photo only" }),
+        ]),
+      ]);
+      card.appendChild(renderShots(group.id, group.label));
+      app.appendChild(card);
+    });
+
+    var ordinal = 0;
+    var total = items.length - (section.extraPhotos || []).length;
+    section.assets.forEach(function (asset) {
+      instancesOf(current.station, asset.id).forEach(function (instance) {
+        ordinal += 1;
+        app.appendChild(renderAsset(asset, instance, ordinal, total));
+      });
+      app.appendChild(addAnotherButton(asset, asset.label));
     });
   }
 
-  function renderAsset(asset, index, total) {
+  function renderAsset(asset, instance, index, total) {
     var card = el("div", {
       class: "card assetcard",
-      "data-rating": current.station.values[asset.id + "_rating"] || "",
+      "data-rating": current.station.values[instance.key + "_rating"] || "",
     });
+    var heading = el("span", { text: labelWith(asset.label, instance) });
     card.appendChild(
-      el("h3", {}, [
-        el("span", { text: asset.label }),
-        el("span", { class: "idx", text: index + 1 + "/" + total }),
-      ])
+      el("h3", {}, [heading, el("span", { class: "idx", text: index + "/" + total })])
     );
-    assetControls(asset, card).forEach(function (node) {
+    if (instance.ordinal > 1) {
+      card.appendChild(
+        instanceControls(asset.id, instance, function (named) {
+          heading.textContent = asset.label + " (" + named + ")";
+        })
+      );
+    }
+    assetControls(asset, instance, card).forEach(function (node) {
       card.appendChild(node);
     });
     return card;
@@ -1322,10 +1536,10 @@
    * strip. Shared by the scrolling list and by focus mode, which lays the same
    * controls out one to a screen. `host` gets the data-rating attribute that
    * colours the surround. */
-  function assetControls(asset, host) {
+  function assetControls(asset, instance, host) {
     var values = current.station.values;
-    var ratingId = asset.id + "_rating";
-    var commentId = asset.id + "_comment";
+    var ratingId = instance.key + "_rating";
+    var commentId = instance.key + "_comment";
 
     var meaning = el("p", { class: "ratingmeaning" });
     function describe(value) {
@@ -1371,7 +1585,7 @@
     var comment = el("textarea", {
       rows: 2,
       placeholder: "What you can see — defects, extent, why it rates that way",
-      "aria-label": asset.label + " comment",
+      "aria-label": labelWith(asset.label, instance) + " comment",
     });
     comment.value = values[commentId] || "";
     comment.addEventListener("input", function () {
@@ -1386,7 +1600,7 @@
       ratings,
       meaning,
       el("div", { class: "field" }, [comment]),
-      renderShots(asset.id, asset.label),
+      renderShots(instance.key, labelWith(asset.label, instance)),
     ];
   }
 
@@ -1399,9 +1613,9 @@
 
     if (current.focus) {
       // Answering the question on screen should move the counter above it.
-      var items = itemsInStage(current.stage);
+      var items = itemsInStage(current.station, current.stage);
       var done = items.filter(function (each) {
-        return itemAnswered(each, counts);
+        return itemAnswered(current.station, each, counts);
       }).length;
       if (focusCountNode) {
         focusCountNode.textContent =
@@ -1491,14 +1705,6 @@
     }
     photo.note = note.trim();
     store.putPhoto(photo).then(refreshPhotos).then(renderKeepingScroll);
-  }
-
-  function renderPhotoGroups(section) {
-    section.groups.forEach(function (group) {
-      var card = el("div", { class: "card" }, [el("h3", { text: group.label })]);
-      card.appendChild(renderShots(group.id, group.label));
-      app.appendChild(card);
-    });
   }
 
   // -- report ---------------------------------------------------------------
@@ -1621,6 +1827,20 @@
   }
 
   /* Assemble the values the template wants, then hand off to docx.js. */
+  /* Every repeatable row's instance list, including the original, so docx.js
+   * knows which rows to duplicate and what to call the copies. */
+  function reportInstances(station) {
+    var out = {};
+    schema.sections.forEach(function (section) {
+      (section.fields || []).concat(section.assets || []).forEach(function (entry) {
+        if (!entry.repeatable) return;
+        var list = instancesOf(station, entry.id);
+        if (list.length > 1) out[entry.id] = list;
+      });
+    });
+    return out;
+  }
+
   function reportValues(station) {
     var values = {};
     var stationId = String(station.values.sps_id || "").trim();
@@ -1640,13 +1860,15 @@
     button.textContent = "Building…";
 
     var ordered = [];
-    (photoSection.groups || []).forEach(collect);
-    (conditionSection.assets || []).forEach(collect);
+    (conditionSection.extraPhotos || []).forEach(collect);
+    conditionSection.assets.forEach(function (asset) {
+      instancesOf(station, asset.id).forEach(collect);
+    });
     ["img_gis", "img_scada"].forEach(function (id) {
       collect({ id: id });
     });
     function collect(entry) {
-      photosIn(entry.id).forEach(function (photo) {
+      photosIn(entry.key || entry.id).forEach(function (photo) {
         ordered.push(photo);
       });
     }
@@ -1674,6 +1896,7 @@
           schema: schema,
           values: reportValues(station),
           photos: loaded[1],
+          instances: reportInstances(station),
         });
       })
       .then(function (result) {

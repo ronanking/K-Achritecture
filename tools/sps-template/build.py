@@ -26,9 +26,9 @@ Run with no arguments from anywhere:  python3 tools/sps-template/build.py
 
 from __future__ import annotations
 
+import copy
 import json
 import re
-import shutil
 import unicodedata
 import zipfile
 from pathlib import Path
@@ -186,6 +186,25 @@ def merge_root_tags(original: str, generated: str) -> str:
     return original[:-1].rstrip() + "".join(additions) + ">"
 
 
+def mark_repeatable(tc, base: str) -> None:
+    """Tag a row's label so the browser can clone the whole row.
+
+    A station can have two sluice valves, or three wells worth of opening
+    measurements, and the template has one row for each. `{{n:base}}` sits
+    after the label: empty on the original row, ` (2)` on a copy. Finding the
+    token is how docx.js locates the `w:tr` to duplicate.
+    """
+    paragraph = tc.findall(W + "p")[-1]
+    runs = paragraph.findall(W + "r")
+    rpr = runs[-1].find(W + "rPr") if runs else None
+    run = ET.SubElement(paragraph, W + "r")
+    if rpr is not None:
+        run.append(copy.deepcopy(rpr))
+    t = ET.SubElement(run, W + "t")
+    t.set(XML_SPACE, "preserve")
+    t.text = "{{n:%s}}" % base
+
+
 def block_paragraph(style: str, token: str):
     """A bare paragraph carrying a block token, for the browser to swap out."""
     p = ET.Element(W + "p")
@@ -282,6 +301,7 @@ class Builder:
         column_labels: list[str] | None = None,
         skip_rows: int = 1,
         force_type: str | None = None,
+        repeatable: bool = False,
     ) -> list[dict]:
         """Put a token in each value cell of a label-per-row table."""
         fields: list[dict] = []
@@ -308,8 +328,14 @@ class Builder:
                 if force_type:
                     spec["type"] = force_type
                     spec.pop("choices", None)
+                if repeatable:
+                    spec["repeatable"] = True
                 tokenise_cell(tcs[col], "{{f:%s}}" % fid)
                 fields.append(spec)
+            # A repeated row carries every value cell in it, so the marker goes
+            # on the row once, keyed to the row rather than to a single field.
+            if repeatable and len(value_columns) == 1:
+                mark_repeatable(tcs[0], base)
         return fields
 
     # -- individual sections --------------------------------------------
@@ -466,11 +492,15 @@ class Builder:
             existing = text_of(tcs[1]).strip()
             fid = slug(label, self.taken, "det")
             tokenise_cell(tcs[1], "{{f:%s}}" % fid)
-            fields.append({"id": fid, "label": label, **classify(label, existing)})
+            mark_repeatable(tcs[0], fid)
+            fields.append({
+                "id": fid, "label": label, "repeatable": True, **classify(label, existing)
+            })
 
         self.sections.append({
             "id": "details", "title": "SPS details",
-            "hint": "Table 1. Placeholders show the format the template expects.",
+            "hint": "Table 1. Placeholders show the format the template expects. "
+                    "Two of something? Add another to that row.",
             "fields": fields,
         })
 
@@ -489,18 +519,23 @@ class Builder:
 
     def build_openings(self) -> None:
         tbl = self.table_after("Table 3:")
-        fields = self.tokenise_table(tbl, prefix="open", value_columns=[1], force_type="text")
+        fields = self.tokenise_table(
+            tbl, prefix="open", value_columns=[1], force_type="text", repeatable=True
+        )
         for f in fields:
             f["inputMode"] = "decimal"
         self.sections.append({
             "id": "openings", "title": "Well openings",
-            "hint": "Table 3. Clear opening measurements in millimetres.",
+            "hint": "Table 3. Clear opening measurements in millimetres. "
+                    "More than one well? Add another set to any row.",
             "fields": fields,
         })
 
     def build_improvements(self) -> None:
         tbl = self.table_after("Table 4:")
-        fields = self.tokenise_table(tbl, prefix="imp", value_columns=[1], force_type="textarea")
+        fields = self.tokenise_table(
+            tbl, prefix="imp", value_columns=[1], force_type="textarea", repeatable=True
+        )
         self.sections.append({
             "id": "improvements", "title": "General improvement works",
             "hint": "Table 4. Leave a row blank and it stays blank in the report.",
@@ -520,18 +555,27 @@ class Builder:
             tokenise_cell(tcs[1], "{{f:%s_rating}}" % base)
             cell_shading_token(tcs[1], "{{shd:%s_rating}}" % base)
             tokenise_cell(tcs[2], "{{f:%s_comment}}" % base)
-            assets.append({"id": base, "label": label})
+            mark_repeatable(tcs[0], base)
+            assets.append({"id": base, "label": label, "repeatable": True})
 
         self.sections.append({
             "id": "condition",
             "title": "Condition assessment",
             "kind": "condition",
-            "hint": "Table 5. Rate it, say why, photograph it. Photos land in Appendix 1 under the asset name.",
+            "hint": "Table 5. Rate it, say why, photograph it. Two of something — a second "
+                    "sluice valve, a second pump — add another and it gets its own row.",
             "assets": assets,
         })
 
     def build_photos(self) -> None:
-        """Appendix 1 — swap the fixed photo grid for one generated at export."""
+        """Appendix 1 — swap the fixed photo grid for one generated at export.
+
+        Most of the template's standing shots are of something that already has
+        a row in the condition table, so they are folded into it: rate the
+        driveway and photograph it in the same breath. The two that are of the
+        site rather than an asset stay as photo-only entries in the same
+        section, so the walk is still one list.
+        """
         heading = self.paragraph_with("Appendix 1")
         start = list(self.body).index(heading) + 1
         groups: list[dict] = []
@@ -555,7 +599,7 @@ class Builder:
             for tc in cells(rows(el)[0]):
                 label = text_of(tc).strip()
                 if label:
-                    groups.append({"id": slug(label, self.taken, "site"), "label": label})
+                    groups.append(label)
             removed.append(el)
 
         for el in removed:
@@ -563,13 +607,24 @@ class Builder:
         self.body.insert(start, block_paragraph("ParaNormal", "{{photos}}"))
         self.els = list(self.body)
 
-        self.sections.append({
-            "id": "photos",
-            "title": "Site photos",
-            "kind": "photos",
-            "hint": "The standing Appendix 1 shots. Anything you photograph on an asset is added here too.",
-            "groups": groups,
-        })
+        condition = [s for s in self.sections if s["id"] == "condition"][0]
+        by_label = {asset["label"]: asset for asset in condition["assets"]}
+
+        unmapped = set(groups) - set(PHOTO_GROUP_MERGES)
+        assert not unmapped, f"photo group not accounted for in PHOTO_GROUP_MERGES: {unmapped}"
+
+        extras = []
+        for label in groups:
+            target = PHOTO_GROUP_MERGES[label]
+            if target is None:
+                extras.append({"id": slug(label, self.taken, "site"), "label": label})
+                continue
+            assert target in by_label, f"no condition row called {target!r} to merge {label!r} into"
+            # The condition row already carries photos; the merge is simply
+            # that this standing shot is no longer asked for separately.
+            by_label[target].setdefault("alsoKnownAs", []).append(label)
+
+        condition["extraPhotos"] = extras
 
     def build_works(self) -> None:
         para = self.paragraph_with("List all required works")
@@ -685,13 +740,30 @@ SECTION_ORDER = [
     ("openings", "field"),
     ("condition", "field"),
     ("improvements", "field"),
-    ("photos", "field"),
     ("details", "office"),
     ("pumps", "office"),
     ("overview", "office"),
     ("works", "office"),
     ("cover", "office"),
 ]
+
+# Which of the template's standing Appendix 1 shots is a photograph of
+# something that already has a row in the condition table. Those are folded
+# into that row — rate it and photograph it in one place. `None` means the
+# shot is of the site rather than an asset, so it stays a photo on its own.
+# Both halves are asserted against the template, so a reissue that renames
+# either side fails the build rather than quietly dropping a photo slot.
+PHOTO_GROUP_MERGES = {
+    "Site Layout": None,
+    "Top Slab": None,
+    "Switchboard": "Switchboard",
+    "Davit Base": "Davit Base",
+    "Bypass point": "Bypass",
+    "Property Pole": "Property Pole",
+    "Wet Well": "Wet Well Wall",
+    "Vent Pole": "Vent Pole / Base",
+    "Zero MH": "Zero Maintenance Hole",
+}
 
 STAGES = [
     {"id": "field", "label": "On site", "hint": "Everything you can answer standing at the station."},
