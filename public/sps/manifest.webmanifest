@@ -1,0 +1,16 @@
+{
+  "name": "SPS Condition Assessment",
+  "short_name": "SPS Assess",
+  "description": "Capture a sewerage pump station condition assessment on site and export the completed Word report.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f2f4f7",
+  "theme_color": "#0b3ba8",
+  "icons": [
+    { "src": "icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

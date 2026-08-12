@@ -361,6 +361,23 @@ Two things to confirm before launch:
 
 ---
 
+## Also in this repository: the SPS field tool
+
+`public/sps/` is a standalone offline web app for writing Unitywater sewerage
+pump station condition assessments on site — unrelated to the practice's work,
+sharing only the hosting. It is plain HTML, CSS and JavaScript with no build
+step and no dependency on Next.js; the site simply serves it as a static folder
+at `/sps/`, and `robots.ts` keeps it out of search.
+
+```bash
+python3 tools/sps-template/build.py         # rebuild the template + field schema
+node    tools/sps-template/test-generate.mjs  # end-to-end docx test, no deps
+```
+
+See [`tools/sps-template/README.md`](tools/sps-template/README.md).
+
+---
+
 ## What would unlock the most
 
 In rough order of impact:

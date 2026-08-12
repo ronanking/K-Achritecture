@@ -8,7 +8,9 @@ export default function robots(): MetadataRoute.Robots {
 
   return {
     rules: isProduction
-      ? { userAgent: "*", allow: "/" }
+      ? // /sps/ is a field tool that happens to be hosted here, not part of
+        // the practice's site. Keep it out of the index.
+        { userAgent: "*", allow: "/", disallow: "/sps/" }
       : { userAgent: "*", disallow: "/" },
     sitemap: `${site.url}/sitemap.xml`,
     host: site.url,
