@@ -113,6 +113,39 @@ export interface Award {
   year: string;
 }
 
+/**
+ * A massing model.
+ *
+ * Massing is the arrangement of volumes — how big the parts are, where they
+ * sit, what bridges what. It is deliberately NOT a representation of the
+ * finished building: no facade, no detail, no material. That distinction
+ * matters, because a massing diagram can be built honestly from published
+ * figures, whereas a detailed model of someone's building cannot be built
+ * from anything less than their own drawings.
+ *
+ * Units are storeys. One unit of height is one level.
+ */
+export interface MassingVolume {
+  id: string;
+  label: string;
+  /** One line on what this volume is, in the project's own documented terms. */
+  note?: string;
+  /** width, height, depth — in storeys. */
+  size: [number, number, number];
+  /** x, y, z of the volume's centre — in storeys. */
+  position: [number, number, number];
+  /** Reads as glazing rather than mass. Used for terraces and pools. */
+  open?: boolean;
+}
+
+export interface Massing {
+  /** What the reader is looking at. */
+  caption: string;
+  /** Where the figures come from, so the diagram can be checked. */
+  basis: string;
+  volumes: MassingVolume[];
+}
+
 export interface Model {
   /** Path to a .glb under /public/models. */
   src: string;
@@ -148,6 +181,7 @@ export interface Project {
   awards?: Award[];
   video?: { src: string; poster?: Plate };
   model?: Model;
+  massing?: Massing;
 
   /** Promoted to the homepage sequence. */
   featured?: boolean;

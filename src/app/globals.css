@@ -475,3 +475,17 @@ html[data-anim="on"] [data-stack-captions] {
     opacity: 1 !important;
   }
 }
+
+/* ==========================================================================
+   THE MASSING STAGE
+
+   OrbitControls writes `touch-action: none` straight onto the canvas element
+   when it connects. On a phone that hands every vertical swipe to the model
+   instead of to the page — a scroll trap two thirds of the way down a long
+   project page. Vertical belongs to the reader; lateral belongs to the model.
+   An inline style can only be overruled from here, hence the !important.
+   ========================================================================== */
+
+[data-massing-stage] canvas {
+  touch-action: pan-y !important;
+}

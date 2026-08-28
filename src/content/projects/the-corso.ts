@@ -93,6 +93,79 @@ export const theCorso: Project = {
     },
   ],
 
+  /**
+   * A massing diagram, not a model of the building.
+   *
+   * Massing is the arrangement of volumes and nothing else: how big the parts
+   * are relative to one another, how high they sit, what bridges what. Every
+   * figure below is derived from the project's own published description —
+   * one hundred and sixteen apartments in one tower and forty-two in the
+   * other, a six hundred square metre communal terrace bridging them at level
+   * four, a one hundred and thirty square metre residents' dining room opening
+   * onto it, and seven hundred and fifteen square metres of retail at the
+   * ground. Relative tower heights follow the apartment counts.
+   *
+   * It does not describe the facade, the detail, the material or the survey.
+   * Where the published description does not fix a position — where exactly
+   * the pool sits behind the retail — the diagram shows the relationship the
+   * description states and claims nothing further.
+   *
+   * Units are storeys. One unit of height is one level.
+   */
+  massing: {
+    caption:
+      "Two towers, split so both get light and air on more sides, bridged at level four by the terrace that becomes the building's best room.",
+    basis:
+      "Diagram of the arrangement described in the project text. Tower heights are derived by giving both towers the same number of apartments per level, so 116 and 42 apartments become 19 and 7 residential levels above the retail. Not a survey, and not to measured dimension.",
+    volumes: [
+      {
+        id: "retail",
+        label: "Ground level retail",
+        note: "715 m² holding the street edge of a city centre still being written.",
+        size: [17, 1, 9],
+        position: [0, 0.5, 0],
+      },
+      {
+        id: "pool",
+        label: "Resort pool",
+        note: "Set behind the retail frontage, at the ground.",
+        size: [7, 0.16, 3.6],
+        position: [0, 0.08, -6.6],
+        open: true,
+      },
+      {
+        id: "tower-one",
+        label: "Tower one",
+        note: "116 apartments, including five penthouses.",
+        size: [5.6, 19, 6],
+        position: [-5.3, 10.5, 0],
+      },
+      {
+        id: "terrace",
+        label: "The level four terrace",
+        note: "600 m² spanning between the towers — the gap made into a room.",
+        size: [6, 0.5, 5],
+        position: [0, 3.75, 0],
+        open: true,
+      },
+      {
+        id: "dining",
+        label: "Residents' dining room",
+        note: "130 m², opening directly onto the terrace.",
+        size: [2.4, 1.1, 2.6],
+        position: [0, 4.55, -1.1],
+        open: true,
+      },
+      {
+        id: "tower-two",
+        label: "Tower two",
+        note: "42 apartments, above the retail frontage.",
+        size: [5.2, 7, 6],
+        position: [5.3, 4.5, 0],
+      },
+    ],
+  },
+
   credits: [
     { role: "Architect", name: "K Architecture" },
     { role: "Developer", name: "Habitat Development Group" },

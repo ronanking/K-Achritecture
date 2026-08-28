@@ -96,7 +96,13 @@ export function Reveal({
     { scope: ref },
   );
 
-  const Component = Tag as React.ElementType;
+  // Narrowed deliberately. React.ElementType resolves against every known
+  // intrinsic element, and once react-three-fiber has added its own to that
+  // list anywhere in the program, the intersection of all their props is
+  // `never`. This component only ever renders ordinary HTML.
+  const Component = Tag as unknown as React.FC<
+    React.HTMLAttributes<HTMLElement> & { ref?: React.Ref<HTMLElement> }
+  >;
 
   return (
     <Component

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ProjectHero } from "@/components/project/ProjectHero";
 import { ProjectSchedule } from "@/components/project/ProjectSchedule";
 import { ProjectFeatures } from "@/components/project/ProjectFeatures";
+import { Massing } from "@/components/project/Massing";
 import { DrawingSequence } from "@/components/project/DrawingSequence";
 import { ProjectGallery } from "@/components/project/ProjectGallery";
 import { NextProject } from "@/components/project/NextProject";
@@ -86,6 +87,10 @@ export default async function ProjectPage({
 
       {project.features?.length ? (
         <ProjectFeatures features={project.features} reference={reference} />
+      ) : null}
+
+      {project.massing ? (
+        <Massing massing={project.massing} reference={reference} />
       ) : null}
 
       <DrawingSequence drawings={project.drawings} reference={reference} />
