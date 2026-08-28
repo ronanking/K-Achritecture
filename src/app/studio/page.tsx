@@ -60,6 +60,7 @@ export default function StudioPage() {
           <div className="bays items-end gap-y-12 pb-16 md:pb-24">
             <div className="col-span-6 md:col-span-6">
               <Plate
+                slot="studio/opening"
                 plate={{
                   alt: "The studio's work seen at close range — light across a finished interior.",
                   aspect: 4 / 3,
@@ -101,6 +102,7 @@ export default function StudioPage() {
             {categories.map((c) => (
               <article key={c.id}>
                 <Plate
+                  slot={`studio/discipline-${c.id}`}
                   plate={{ ...disciplinePlate[c.id], aspect: 3 / 4 }}
                   sizes="(min-width: 80rem) 22vw, 44vw"
                   reference="KA"
@@ -191,6 +193,7 @@ export default function StudioPage() {
       {/* ---- Close ----------------------------------------------------- */}
       <section data-surface="ink" aria-label="Contact the studio" className="relative">
         <Plate
+          slot="studio/coda"
           plate={{
             alt: "The Sunshine Coast at dusk, seen from one of the studio's buildings.",
             aspect: 21 / 9,

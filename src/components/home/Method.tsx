@@ -140,6 +140,7 @@ export function Method() {
               <article key={p.index}>
                 <div className="relative">
                   <Plate
+                    slot={`home/method-${p.index}`}
                     plate={{ alt: p.alt, aspect: 3 / 4, tone: p.tone }}
                     sizes="(min-width: 80rem) 22vw, (min-width: 48rem) 44vw, 44vw"
                     reference={`KA · ${p.index}`}

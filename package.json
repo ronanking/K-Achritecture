@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "prebuild": "node tools/media/scan.mjs",
+    "media:scan": "node tools/media/scan.mjs",
+    "media:harvest": "node --experimental-strip-types tools/media/harvest.mjs"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",

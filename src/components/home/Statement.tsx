@@ -32,6 +32,7 @@ export function Statement() {
         <div className="bays items-end gap-y-12 py-14 md:py-20">
           <div className="col-span-6 md:col-span-5">
             <Plate
+              slot="home/statement-01"
               plate={{
                 alt: "A K Architecture interior, light falling across the room from a full-height opening.",
                 aspect: 3 / 4,
@@ -65,6 +66,7 @@ export function Statement() {
 
       {/* Released to the full width. The page opens out before the band. */}
       <Plate
+        slot="home/statement-02"
         plate={{
           alt: "A K Architecture house seen long and low across its landscape.",
           aspect: 21 / 9,

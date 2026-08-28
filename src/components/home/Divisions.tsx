@@ -58,6 +58,7 @@ export function Divisions() {
             style={{ opacity: active === d.id ? 0.68 : 0 }}
           >
             <Plate
+              slot={`home/division-${d.id}`}
               plate={{ ...backdrop[d.id], aspect: 16 / 9 }}
               fill
               sizes="100vw"
@@ -111,6 +112,7 @@ export function Divisions() {
                 {/* Handheld carries the image with the row. */}
                 <div className="mt-5 md:hidden">
                   <Plate
+                    slot={`home/division-${d.id}`}
                     plate={{ ...backdrop[d.id], aspect: 16 / 9 }}
                     sizes="100vw"
                   />

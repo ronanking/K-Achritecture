@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { mediaFor } from "@/lib/media";
 import type { Plate as PlateData, PlateTone } from "@/lib/projects/types";
 
 /**
@@ -65,6 +66,12 @@ function ratioLabel(aspect: number): string {
 
 export interface PlateProps {
   plate: PlateData;
+  /**
+   * Where this plate sits, as a stable name — "home/coda", "studio/portrait".
+   * A photograph supplied at that slot is used; otherwise the plate composes.
+   * Project plates are resolved before they get here and do not need one.
+   */
+  slot?: string;
   /** Sheet reference printed on a pending plate, e.g. "KA-02 / P-04". */
   reference?: string;
   /** Responsive sizes hint. Always pass the real measure the plate occupies. */
@@ -84,6 +91,7 @@ export interface PlateProps {
 
 export function Plate({
   plate,
+  slot,
   reference,
   sizes = "100vw",
   priority = false,
@@ -93,13 +101,14 @@ export function Plate({
   children,
 }: PlateProps) {
   const tone: PlateTone = plate.tone ?? "shadow";
+  const src = plate.src ?? mediaFor(slot);
 
   return (
     <figure
       className={`relative overflow-hidden ${fill ? "h-full w-full" : ""} ${className}`}
       style={fill ? undefined : { aspectRatio: String(plate.aspect) }}
     >
-      {plate.src ? (
+      {src ? (
         <>
           <div
             aria-hidden
@@ -107,7 +116,7 @@ export function Plate({
             style={{ backgroundColor: palette[tone].base }}
           />
           <Image
-            src={plate.src}
+            src={src}
             alt={plate.alt}
             fill
             sizes={sizes}

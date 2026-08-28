@@ -56,6 +56,7 @@ export function Coda() {
         aria-hidden
       >
         <Plate
+          slot="home/coda"
           plate={{
             alt: "A K Architecture house at dusk, light coming from within.",
             aspect: 16 / 9,

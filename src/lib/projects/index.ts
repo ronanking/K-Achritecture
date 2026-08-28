@@ -1,14 +1,21 @@
 import { projects } from "@/content/projects";
+import { attachMedia } from "@/lib/media";
 import { categories } from "./categories";
 import type { CategoryId, Project } from "./types";
 
 export * from "./types";
 export { categories, categoryById, categoryTitle } from "./categories";
 
-/** The schedule, in sheet order. */
-export const allProjects: Project[] = [...projects].sort(
-  (a, b) => a.order - b.order,
-);
+/**
+ * The schedule, in sheet order, with any supplied photography attached.
+ *
+ * Resolving media here rather than in the content files means the archive can
+ * arrive in pieces: a project with photographs shows them, a project without
+ * shows composed plates, and no component has to care which it is holding.
+ */
+export const allProjects: Project[] = [...projects]
+  .sort((a, b) => a.order - b.order)
+  .map(attachMedia);
 
 /** Sheet reference, e.g. "01". Derived from position, never stored. */
 export function sheetRef(project: Project): string {
