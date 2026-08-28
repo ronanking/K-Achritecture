@@ -56,7 +56,7 @@ export function project(x: number, y: number, z: number): [number, number] {
   return [B.ax * x + B.az * z, B.bx * x + B.by * y + B.bz * z];
 }
 
-export interface Bounds {
+interface Bounds {
   x0: number;
   x1: number;
   y0: number;
@@ -65,7 +65,7 @@ export interface Bounds {
   z1: number;
 }
 
-export function bounds(v: MassingVolume): Bounds {
+function bounds(v: MassingVolume): Bounds {
   const [w, h, d] = v.size;
   const [px, py, pz] = v.position;
   return {
@@ -85,7 +85,7 @@ export function bounds(v: MassingVolume): Bounds {
  * these are the model's own gridlines made visible. A volume only gets them if
  * it is tall enough for the count to mean something.
  */
-export function levels(v: MassingVolume): number[] {
+function levels(v: MassingVolume): number[] {
   const b = bounds(v);
   if (b.y1 - b.y0 < 2) return [];
   const out: number[] = [];
@@ -106,7 +106,7 @@ export function levels(v: MassingVolume): number[] {
  * are settled by depth, and either answer is defensible, because the two
  * really do occupy the same space.
  */
-export function drawOrder(volumes: MassingVolume[]): MassingVolume[] {
+function drawOrder(volumes: MassingVolume[]): MassingVolume[] {
   const boxes = volumes.map(bounds);
   const n = volumes.length;
   const depth = volumes.map((v) => v.position[0] + v.position[1] + v.position[2]);
@@ -277,48 +277,54 @@ export function axonometric(
 }
 
 /**
- * Translation that puts the centre of the axonometric drawing on the origin.
+ * The drawing an axis-aligned box makes on the sheet.
  *
- * The projection is linear, so this is solvable rather than approximate: hold
- * the model's own ground centre on the screen centre by inverting the two
- * screen axes. Orbiting away from the default view shifts the framing a
- * little, which is what happens when you walk around a model.
+ * Used to frame a model whose extent is only known once it has loaded — the
+ * Blender model carries a base plate the volume data knows nothing about, and
+ * fitting to the volumes alone would run it off the edge of the stage.
  */
-export function centringOffset(
-  volumes: MassingVolume[],
+export function projectedFrame(
+  min: [number, number, number],
+  max: [number, number, number],
+) {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  for (const x of [min[0], max[0]]) {
+    for (const y of [min[1], max[1]]) {
+      for (const z of [min[2], max[2]]) {
+        const [sx, sy] = project(x, y, z);
+        minX = Math.min(minX, sx);
+        maxX = Math.max(maxX, sx);
+        minY = Math.min(minY, sy);
+        maxY = Math.max(maxY, sy);
+      }
+    }
+  }
+
+  return {
+    width: round(maxX - minX),
+    height: round(maxY - minY),
+    cx: round((minX + maxX) / 2),
+    cy: round((minY + maxY) / 2),
+  };
+}
+
+/**
+ * Translation that puts a projected centre on the origin.
+ *
+ * The projection is linear, so this is solvable rather than approximate.
+ * Fixing tz at zero determines the pair: ax·tx = -cx gives tx, and the
+ * remaining equation gives ty. Orbiting away from the default view shifts the
+ * framing a little, which is what happens when you walk around a model.
+ */
+export function offsetForCentre(
+  cx: number,
+  cy: number,
 ): [number, number, number] {
-  const { cx, cy } = axonometric(volumes);
-  // Solve project(t) = (-cx, -cy) with tz chosen so the pair is determined.
-  // ax·tx + az·tz = -cx and bx·tx + by·ty + bz·tz = -cy, taking tz = 0.
   const tx = -cx / B.ax;
   const ty = (-cy - B.bx * tx) / B.by;
   return [tx, ty, 0];
-}
-
-/** Centre and extent of the whole model, used to frame both renderers. */
-export function extent(volumes: MassingVolume[]) {
-  let x0 = Infinity;
-  let x1 = -Infinity;
-  let y0 = Infinity;
-  let y1 = -Infinity;
-  let z0 = Infinity;
-  let z1 = -Infinity;
-  for (const v of volumes) {
-    const b = bounds(v);
-    x0 = Math.min(x0, b.x0);
-    x1 = Math.max(x1, b.x1);
-    y0 = Math.min(y0, b.y0);
-    y1 = Math.max(y1, b.y1);
-    z0 = Math.min(z0, b.z0);
-    z1 = Math.max(z1, b.z1);
-  }
-  return {
-    centre: [(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2] as [
-      number,
-      number,
-      number,
-    ],
-    size: [x1 - x0, y1 - y0, z1 - z0] as [number, number, number],
-    ground: y0,
-  };
 }

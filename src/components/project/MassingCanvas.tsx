@@ -1,36 +1,43 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { Suspense, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 import {
   VIEW_DIRECTION,
-  axonometric,
-  centringOffset,
-  extent,
-  levels,
+  offsetForCentre,
+  projectedFrame,
 } from "@/lib/massing/axonometric";
 import type { MassingVolume } from "@/lib/projects/types";
 
 /**
  * The massing model, turnable.
  *
- * The same volumes as the flat drawing, in a WebGL context that you can walk
- * around. Everything here is deliberately restrained:
+ * The geometry is a card model built in Blender by tools/massing, from the
+ * same volume data the flat drawing projects — bevelled arrises, a floor line
+ * scored at every storey, a base plate, and ambient occlusion baked per
+ * object. Direct light is not baked: it is added here, so the scored lines
+ * shade from their own normals and stay crisp at any zoom instead of smearing
+ * into whatever a texture could hold.
  *
- *   · frameloop="demand" — the loop is idle unless something is actually
- *     moving. A model sitting still on a page costs nothing.
+ * Everything else is deliberately restrained:
+ *
+ *   · frameloop="demand" — the loop is idle unless something is moving. A
+ *     model sitting still on a page costs nothing.
  *   · No zoom, on either pointer type. A canvas that eats the scroll wheel on
  *     a scroll-driven site is a trap, not a feature.
  *   · No auto-rotate. A building that spins is a product shot; this is a
- *     diagram, and it holds still until somebody turns it.
+ *     study model, and it holds still until somebody turns it.
  *   · Oxide marks the isolated volume and nothing else, which is the one rule
  *     the accent colour has anywhere on this site.
  */
 
 export type ViewPreset = "axonometric" | "elevation" | "plan" | "free";
+
+export const MODEL_URL = "/models/the-corso-massing.glb";
 
 /**
  * Direction the camera sits in, per named view. Normalised on use.
@@ -47,11 +54,11 @@ const DIRECTION: Record<Exclude<ViewPreset, "free">, THREE.Vector3> = {
 const RADIUS = 60;
 
 const COLOUR = {
-  solid: "#8f8c83",
-  open: "#d9d3c5",
-  edge: "#c7c2b7",
+  /** A drawn edge, for a volume that is present. Reads against pale card. */
+  edge: "#2f2d29",
+  /** A ghost's edge. Reads against the black stage, where a dark line cannot. */
+  ghost: "#c7c2b7",
   active: "#9b4e28",
-  grid: "#c7c2b7",
 } as const;
 
 export interface MassingCanvasProps {
@@ -69,21 +76,7 @@ export interface MassingCanvasProps {
   onReady?: () => void;
 }
 
-export default function MassingCanvas({
-  volumes,
-  active,
-  hovered,
-  preset,
-  reduced,
-  onHover,
-  onSelect,
-  onFreeLook,
-  onReady,
-}: MassingCanvasProps) {
-  const drawing = useMemo(() => axonometric(volumes), [volumes]);
-  const offset = useMemo(() => centringOffset(volumes), [volumes]);
-  const ground = useMemo(() => extent(volumes).ground, [volumes]);
-
+export default function MassingCanvas(props: MassingCanvasProps) {
   const start = useMemo(
     () => DIRECTION.axonometric.clone().normalize().multiplyScalar(RADIUS),
     [],
@@ -96,86 +89,249 @@ export default function MassingCanvas({
       dpr={[1, 1.75]}
       gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
       camera={{ position: start.toArray(), zoom: 20, near: 0.1, far: 400 }}
-      onCreated={onReady}
       style={{ width: "100%", height: "100%" }}
+      // No tone mapping. A filmic curve is for photographs of the world; this
+      // is a card model under a studio light, and rolling its highlights off
+      // only takes the arrises with them.
+      flat
     >
-      <ambientLight intensity={1.15} />
-      <directionalLight position={[9, 15, 11]} intensity={2.3} />
-      <directionalLight position={[-11, 5, -9]} intensity={0.55} />
+      {/* Direct light only. The ambient term carries the baked occlusion. */}
+      <ambientLight intensity={0.75} />
+      <directionalLight position={[9, 15, 11]} intensity={1.15} />
+      <directionalLight position={[-11, 5, -9]} intensity={0.28} />
 
-      <Fit width={drawing.width} height={drawing.height} />
-      <View preset={preset} reduced={reduced} />
-      <Controls onFreeLook={onFreeLook} />
+      <View preset={props.preset} reduced={props.reduced} />
+      <Controls onFreeLook={props.onFreeLook} />
 
-      <group position={offset}>
-        <SettingOut volumes={volumes} ground={ground} />
-
-        {volumes.map((v) => (
-          <Volume
-            key={v.id}
-            volume={v}
-            state={
-              active === null
-                ? hovered === v.id
-                  ? "hover"
-                  : "normal"
-                : active === v.id
-                  ? "isolated"
-                  : "recessed"
-            }
-            reduced={reduced}
-            onHover={onHover}
-            onSelect={onSelect}
-          />
-        ))}
-      </group>
+      {/* Nothing stands in for the model while it loads. The flat drawing is
+          still underneath, and it is a better wait than a spinner. */}
+      <Suspense fallback={null}>
+        <Model {...props} />
+      </Suspense>
     </Canvas>
   );
 }
 
 /* -------------------------------------------------------------------------- */
 
-type VolumeState = "normal" | "hover" | "isolated" | "recessed";
-
-/** Fill, edge, storey line and colour, per state and per volume kind. */
-function appearance(state: VolumeState, open: boolean) {
-  const base = open ? 0.44 : 1;
-  switch (state) {
-    case "recessed":
-      return {
-        fill: base * 0.16,
-        edge: 0.22,
-        storey: 0.05,
-        colour: COLOUR.edge,
-      };
-    case "isolated":
-      return { fill: base, edge: 1, storey: 0.5, colour: COLOUR.active };
-    case "hover":
-      return { fill: base, edge: 0.9, storey: 0.42, colour: COLOUR.active };
-    default:
-      return { fill: base, edge: 0.45, storey: 0.16, colour: COLOUR.edge };
-  }
-}
-
-function Volume({
-  volume,
-  state,
+/**
+ * The card model, and the framing that comes with it.
+ *
+ * The model's extent is only knowable once it has loaded — it carries a base
+ * plate the volume data says nothing about — so the fit is measured from the
+ * loaded geometry rather than guessed from the volumes.
+ */
+function Model({
+  volumes,
+  active,
+  hovered,
   reduced,
   onHover,
   onSelect,
+  onReady,
+}: MassingCanvasProps) {
+  const gltf = useLoader(GLTFLoader, MODEL_URL);
+
+  const nodes = useMemo(() => {
+    const found = new Map<string, THREE.Mesh>();
+    gltf.scene.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh && child.name.startsWith("massing_")) {
+        found.set(child.name.slice("massing_".length), child as THREE.Mesh);
+      }
+    });
+    return found;
+  }, [gltf]);
+
+  const frame = useMemo(() => {
+    const box = new THREE.Box3().setFromObject(gltf.scene);
+    return projectedFrame(
+      [box.min.x, box.min.y, box.min.z],
+      [box.max.x, box.max.y, box.max.z],
+    );
+  }, [gltf]);
+
+  const offset = useMemo(
+    () => offsetForCentre(frame.cx, frame.cy),
+    [frame.cx, frame.cy],
+  );
+
+  useEffect(() => {
+    onReady?.();
+  }, [onReady]);
+
+  const base = nodes.get("base");
+
+  return (
+    <>
+      <Fit width={frame.width} height={frame.height} />
+
+      <group position={offset}>
+        {base ? (
+          <Piece
+            node={base}
+            state={active ? "recessed" : "normal"}
+            reduced={reduced}
+          />
+        ) : null}
+
+        {volumes.map((v) => {
+          const node = nodes.get(v.id);
+          if (!node) return null;
+          const state: PieceState =
+            active === null
+              ? hovered === v.id
+                ? "hover"
+                : "normal"
+              : active === v.id
+                ? "isolated"
+                : "recessed";
+          return (
+            <Piece
+              key={v.id}
+              node={node}
+              state={state}
+              reduced={reduced}
+              onHover={() => onHover(v.id)}
+              onLeave={() => onHover(null)}
+              onSelect={() => onSelect(v.id)}
+            >
+              <Silhouette volume={v} state={state} reduced={reduced} />
+            </Piece>
+          );
+        })}
+      </group>
+    </>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+
+type PieceState = "normal" | "hover" | "isolated" | "recessed";
+
+/** Fill opacity per state. Colour is the model's own; only presence changes. */
+function fillFor(state: PieceState): number {
+  return state === "recessed" ? 0.12 : 1;
+}
+
+/** Edge opacity and colour per state. Oxide marks the isolated volume. */
+function edgeFor(state: PieceState) {
+  switch (state) {
+    case "recessed":
+      return { opacity: 0.2, colour: COLOUR.ghost };
+    case "isolated":
+      return { opacity: 1, colour: COLOUR.active };
+    case "hover":
+      return { opacity: 0.85, colour: COLOUR.active };
+    default:
+      return { opacity: 0.32, colour: COLOUR.edge };
+  }
+}
+
+function Piece({
+  node,
+  state,
+  reduced,
+  onHover,
+  onLeave,
+  onSelect,
+  children,
 }: {
-  volume: MassingVolume;
-  state: VolumeState;
+  node: THREE.Mesh;
+  state: PieceState;
   reduced: boolean;
-  onHover: (id: string | null) => void;
-  onSelect: (id: string) => void;
+  onHover?: () => void;
+  onLeave?: () => void;
+  onSelect?: () => void;
+  children?: React.ReactNode;
 }) {
-  const open = volume.open === true;
-  const fill = useRef<THREE.MeshLambertMaterial>(null);
-  const line = useRef<THREE.LineBasicMaterial>(null);
-  const storeyLine = useRef<THREE.LineBasicMaterial>(null);
   const invalidate = useThree((s) => s.invalidate);
 
+  // The loader's material is read for its settings but never used directly:
+  // it is shared between every mesh that references it in the file, and this
+  // component is about to start animating opacity. Declaring our own here
+  // means react-three-fiber owns its lifetime and disposes it with the mesh.
+  const source = node.material as THREE.MeshStandardMaterial;
+  const material = useRef<THREE.MeshStandardMaterial>(null);
+
+  const target = fillFor(state);
+
+  useEffect(() => {
+    const m = material.current;
+    if (reduced && m) {
+      m.opacity = target;
+      m.depthWrite = target > 0.9;
+    }
+    invalidate();
+  }, [reduced, target, invalidate]);
+
+  useFrame((_, delta) => {
+    if (reduced) return;
+    const m = material.current;
+    if (!m) return;
+    const d = target - m.opacity;
+    if (Math.abs(d) < 0.003) return;
+    m.opacity += d * (1 - Math.exp(-9 * Math.min(delta, 0.1)));
+    // Ghosted volumes must not write depth or they punch holes in the one you
+    // are actually looking at.
+    m.depthWrite = m.opacity > 0.9;
+    invalidate();
+  });
+
+  return (
+    <mesh
+      geometry={node.geometry}
+      onPointerOver={
+        onHover
+          ? (e) => {
+              e.stopPropagation();
+              onHover();
+            }
+          : undefined
+      }
+      onPointerOut={onLeave}
+      onClick={
+        onSelect
+          ? (e) => {
+              e.stopPropagation();
+              onSelect();
+            }
+          : undefined
+      }
+    >
+      <meshStandardMaterial
+        ref={material}
+        color={source.color}
+        roughness={source.roughness}
+        metalness={source.metalness}
+        aoMap={source.aoMap}
+        aoMapIntensity={1}
+        transparent
+        opacity={1}
+      />
+      {children}
+    </mesh>
+  );
+}
+
+/**
+ * The volume's outline, drawn over the card.
+ *
+ * Taken from the volume data rather than from the model's edges: the card has
+ * bevelled arrises and eighteen scored floor lines, and tracing all of that
+ * would bury the one line that carries meaning. This is the box the project
+ * data describes, and it is the only thing that ever turns oxide.
+ */
+function Silhouette({
+  volume,
+  state,
+  reduced,
+}: {
+  volume: MassingVolume;
+  state: PieceState;
+  reduced: boolean;
+}) {
+  const line = useRef<THREE.LineBasicMaterial>(null);
+  const invalidate = useThree((s) => s.invalidate);
   const [w, h, d] = volume.size;
 
   // EdgesGeometry copies what it needs, so the box it is derived from can go
@@ -188,209 +344,47 @@ function Volume({
   }, [w, h, d]);
   useEffect(() => () => edges.dispose(), [edges]);
 
-  // The storey lines, in local space. Four segments per level, so they hold up
-  // from any angle rather than only from the drawing's own.
-  const storeys = useMemo(() => {
-    const ys = levels(volume).map((y) => y - volume.position[1]);
-    if (!ys.length) return null;
-    const x = w / 2;
-    const z = d / 2;
-    const points: number[] = [];
-    for (const y of ys) {
-      points.push(-x, y, -z, x, y, -z);
-      points.push(x, y, -z, x, y, z);
-      points.push(x, y, z, -x, y, z);
-      points.push(-x, y, z, -x, y, -z);
-    }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute(points, 3),
-    );
-    return geometry;
-  }, [volume, w, d]);
-  useEffect(() => () => storeys?.dispose(), [storeys]);
-
-  const target = appearance(state, open);
+  const target = edgeFor(state);
   const goal = useMemo(() => new THREE.Color(target.colour), [target.colour]);
 
   useEffect(() => {
-    if (!reduced) {
-      invalidate();
-      return;
-    }
-    // Reduced motion: no easing, the state is simply the state.
-    if (fill.current) fill.current.opacity = target.fill;
-    if (line.current) {
-      line.current.opacity = target.edge;
+    if (reduced && line.current) {
+      line.current.opacity = target.opacity;
       line.current.color.set(target.colour);
     }
-    if (storeyLine.current) {
-      storeyLine.current.opacity = target.storey;
-      storeyLine.current.color.set(target.colour);
-    }
     invalidate();
-  }, [
-    reduced,
-    target.fill,
-    target.edge,
-    target.storey,
-    target.colour,
-    invalidate,
-  ]);
+  }, [reduced, target.opacity, target.colour, invalidate]);
 
   useFrame((_, delta) => {
     if (reduced) return;
-    const f = fill.current;
     const l = line.current;
-    if (!f || !l) return;
-
-    // Framerate-independent. A fixed per-frame fraction eases at whatever
-    // speed the machine happens to run at, which is how the same transition
-    // ends up instant on one laptop and slow on another.
+    if (!l) return;
     const k = 1 - Math.exp(-9 * Math.min(delta, 0.1));
-    const s = storeyLine.current;
-    const df = target.fill - f.opacity;
-    const de = target.edge - l.opacity;
-    const ds = s ? target.storey - s.opacity : 0;
-    const dc = l.color.getHex() === goal.getHex() ? 0 : 1;
-
-    f.opacity += df * k;
-    l.opacity += de * k;
+    const d0 = target.opacity - l.opacity;
+    const shifted = l.color.getHex() !== goal.getHex();
+    l.opacity += d0 * k;
     l.color.lerp(goal, k);
-    if (s) {
-      s.opacity += ds * k;
-      s.color.lerp(goal, k);
-    }
-
-    // Ghosted volumes must not write depth or they punch holes in the one you
-    // are actually looking at.
-    f.depthWrite = f.opacity > 0.9;
-
-    if (
-      Math.abs(df) > 0.003 ||
-      Math.abs(de) > 0.003 ||
-      Math.abs(ds) > 0.003 ||
-      dc
-    )
-      invalidate();
-  }, 0);
+    if (Math.abs(d0) > 0.003 || shifted) invalidate();
+  });
 
   return (
-    <group position={volume.position}>
-      <mesh
-        onPointerOver={(e) => {
-          e.stopPropagation();
-          onHover(volume.id);
-        }}
-        onPointerOut={() => onHover(null)}
-        onClick={(e) => {
-          e.stopPropagation();
-          onSelect(volume.id);
-        }}
-      >
-        <boxGeometry args={[w, h, d]} />
-        <meshLambertMaterial
-          ref={fill}
-          color={open ? COLOUR.open : COLOUR.solid}
-          transparent
-          opacity={open ? 0.44 : 1}
-        />
-      </mesh>
-
-      <lineSegments geometry={edges} raycast={() => null}>
-        <lineBasicMaterial
-          ref={line}
-          color={COLOUR.edge}
-          transparent
-          opacity={0.45}
-          depthWrite={false}
-        />
-      </lineSegments>
-
-      {storeys ? (
-        <lineSegments geometry={storeys} raycast={() => null}>
-          <lineBasicMaterial
-            ref={storeyLine}
-            color={COLOUR.edge}
-            transparent
-            opacity={0.16}
-            depthWrite={false}
-          />
-        </lineSegments>
-      ) : null}
-    </group>
+    <lineSegments
+      geometry={edges}
+      position={volume.position}
+      raycast={() => null}
+    >
+      <lineBasicMaterial
+        ref={line}
+        color={COLOUR.edge}
+        transparent
+        opacity={0.3}
+        depthWrite={false}
+      />
+    </lineSegments>
   );
 }
 
-/**
- * The setting-out: a grid at ground level, and the footprint of each mass laid
- * flat on it. The footprints do the work a shadow map would do — they say
- * where the building meets the ground — for the price of a few flat planes and
- * no second render pass. The light elements are left out of it; a terrace does
- * not cast the shadow of a building.
- */
-function SettingOut({
-  volumes,
-  ground,
-}: {
-  volumes: MassingVolume[];
-  ground: number;
-}) {
-  const grid = useMemo(() => {
-    const half = 22;
-    const step = 2;
-    const points: number[] = [];
-    for (let i = -half; i <= half; i += step) {
-      points.push(-half, 0, i, half, 0, i);
-      points.push(i, 0, -half, i, 0, half);
-    }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute(points, 3),
-    );
-    return geometry;
-  }, []);
-  useEffect(() => () => grid.dispose(), [grid]);
-
-  return (
-    <group>
-      <lineSegments
-        geometry={grid}
-        position={[0, ground, 0]}
-        raycast={() => null}
-      >
-        <lineBasicMaterial
-          color={COLOUR.grid}
-          transparent
-          opacity={0.09}
-          depthWrite={false}
-        />
-      </lineSegments>
-
-      {volumes
-        .filter((v) => v.open !== true)
-        .map((v) => (
-          <mesh
-            key={v.id}
-            position={[v.position[0], ground + 0.01, v.position[2]]}
-            rotation={[-Math.PI / 2, 0, 0]}
-            raycast={() => null}
-            renderOrder={-1}
-          >
-            <planeGeometry args={[v.size[0], v.size[2]]} />
-            <meshBasicMaterial
-              color="#000000"
-              transparent
-              opacity={0.42}
-              depthWrite={false}
-            />
-          </mesh>
-        ))}
-    </group>
-  );
-}
+/* -------------------------------------------------------------------------- */
 
 /**
  * Fits the drawing to the stage. Orthographic, so this is purely zoom.
@@ -405,7 +399,7 @@ function Fit({ width, height }: { width: number; height: number }) {
   const zoom = useRef(1);
 
   useEffect(() => {
-    zoom.current = Math.min(size.width / width, size.height / height);
+    zoom.current = Math.min(size.width / width, size.height / height) * 0.97;
     invalidate();
   }, [size.width, size.height, width, height, invalidate]);
 
@@ -476,7 +470,6 @@ function Controls({ onFreeLook }: { onFreeLook: () => void }) {
   const camera = useThree((s) => s.camera);
   const domElement = useThree((s) => s.gl.domElement);
   const invalidate = useThree((s) => s.invalidate);
-
   const controls = useRef<OrbitControls | null>(null);
 
   useEffect(() => {

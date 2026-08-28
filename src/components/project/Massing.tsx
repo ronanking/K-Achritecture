@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Component, useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { motion } from "motion/react";
 
@@ -43,6 +43,32 @@ function supportsWebGL(): boolean {
     webgl = false;
   }
   return webgl;
+}
+
+/**
+ * If the model cannot be fetched or decoded, it simply never appears.
+ *
+ * The flat drawing underneath is a complete answer on its own, so there is
+ * nothing to apologise for and nothing to report — a broken asset should cost
+ * the reader the model, not the section.
+ */
+class ModelBoundary extends Component<
+  { onFail: () => void; children: React.ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch() {
+    this.props.onFail();
+  }
+
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
 }
 
 const VIEWS: { id: Exclude<ViewPreset, "free">; label: string }[] = [
@@ -107,6 +133,10 @@ export function Massing({
   }, []);
 
   const onFreeLook = useCallback(() => setPreset("free"), []);
+  const onFail = useCallback(() => {
+    setLive(false);
+    setReady(false);
+  }, []);
   const onReady = useCallback(() => setReady(true), []);
   const onHover = useCallback((id: string | null) => setHovered(id), []);
   const onSelect = useCallback(
@@ -159,17 +189,19 @@ export function Massing({
                     touchAction: "pan-y",
                   }}
                 >
-                  <MassingCanvas
-                    volumes={massing.volumes}
-                    active={active}
-                    hovered={hovered}
-                    preset={preset}
-                    reduced={reduced}
-                    onHover={onHover}
-                    onSelect={onSelect}
-                    onFreeLook={onFreeLook}
-                    onReady={onReady}
-                  />
+                  <ModelBoundary onFail={onFail}>
+                    <MassingCanvas
+                      volumes={massing.volumes}
+                      active={active}
+                      hovered={hovered}
+                      preset={preset}
+                      reduced={reduced}
+                      onHover={onHover}
+                      onSelect={onSelect}
+                      onFreeLook={onFreeLook}
+                      onReady={onReady}
+                    />
+                  </ModelBoundary>
                 </div>
               ) : null}
 
